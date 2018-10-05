@@ -1,0 +1,5 @@
+__pychache__/
+.spyproject
+
+*.py[cod]
+*$py.class
