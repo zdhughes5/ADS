@@ -1347,7 +1347,7 @@
            </sizepolicy>
           </property>
           <property name="currentIndex">
-           <number>1</number>
+           <number>0</number>
           </property>
           <widget class="QWidget" name="AcquireTab" native="true">
            <attribute name="title">
@@ -1356,6 +1356,34 @@
            <layout class="QVBoxLayout" name="EventRightSide">
             <item>
              <layout class="QGridLayout" name="gridLayout_5">
+              <item row="3" column="1">
+               <layout class="QHBoxLayout" name="horizontalLayout_12">
+                <item>
+                 <widget class="QLineEdit" name="TimeoutSet">
+                  <property name="enabled">
+                   <bool>false</bool>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLineEdit" name="TimeoutRO">
+                  <property name="enabled">
+                   <bool>false</bool>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item row="3" column="0">
+               <widget class="QLabel" name="TimeoutLabel">
+                <property name="text">
+                 <string>Set Timeout</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignCenter</set>
+                </property>
+               </widget>
+              </item>
               <item row="1" column="0">
                <widget class="QLabel" name="DurationLabel">
                 <property name="sizePolicy">
@@ -1376,6 +1404,16 @@
                <widget class="QCheckBox" name="SaveDataCB">
                 <property name="text">
                  <string>Save Data</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="2">
+               <widget class="QPushButton" name="TimeoutButton">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+                <property name="text">
+                 <string>Set</string>
                 </property>
                </widget>
               </item>
@@ -1522,6 +1560,13 @@
               </item>
               <item row="7" column="0">
                <layout class="QVBoxLayout" name="verticalLayout_7">
+                <item>
+                 <widget class="QCheckBox" name="VerboseCB">
+                  <property name="text">
+                   <string>Verbose</string>
+                  </property>
+                 </widget>
+                </item>
                 <item>
                  <widget class="QRadioButton" name="DurationRadio">
                   <property name="sizePolicy">
@@ -1792,44 +1837,6 @@
                 </property>
                 <property name="readOnly">
                  <bool>true</bool>
-                </property>
-               </widget>
-              </item>
-              <item row="3" column="0">
-               <widget class="QLabel" name="TimeoutLabel">
-                <property name="text">
-                 <string>Set Timeout</string>
-                </property>
-                <property name="alignment">
-                 <set>Qt::AlignCenter</set>
-                </property>
-               </widget>
-              </item>
-              <item row="3" column="1">
-               <layout class="QHBoxLayout" name="horizontalLayout_12">
-                <item>
-                 <widget class="QLineEdit" name="TimeoutSet">
-                  <property name="enabled">
-                   <bool>false</bool>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLineEdit" name="TimeoutRO">
-                  <property name="enabled">
-                   <bool>false</bool>
-                  </property>
-                 </widget>
-                </item>
-               </layout>
-              </item>
-              <item row="3" column="2">
-               <widget class="QPushButton" name="TimeoutButton">
-                <property name="enabled">
-                 <bool>false</bool>
-                </property>
-                <property name="text">
-                 <string>Set</string>
                 </property>
                </widget>
               </item>

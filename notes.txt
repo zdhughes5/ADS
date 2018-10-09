@@ -1,0 +1,7 @@
+On the topic of speed/latency:
+
+The current working, stable, build had ~40 ms dead time between events. 
+Upon disabling Nagle's Algorithm on the server bind the speed dramatically increased (2 ms deadtime). But the server/client were desyncing and failing.
+I found that the continue check was receiving 4 bytes on the client side but only sending 1 on the server. I seem to recall doing this to prevent desyncing/failure 
+previously, but I didn't (and still don't) understand why it worked to resolve the desync. Currently I have Nagle's disabled and the continue rendevous only sending receiving 1 byte.
+This situation seems to both offer dramatic performence gains as well as being logical (i.e. no poorly understood hacks). Further testing needs to be done.

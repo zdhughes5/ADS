@@ -55,7 +55,9 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 		self.directory = None
 		self.FilenameSet.setText('run')
 		self.filename = None
-		self.savedata = False
+		self.spill = None
+		self.saveData = self.SaveDataCB.isChecked()
+		self.verbose = self.VerboseCB.isChecked()
 		
 		self.channelsSelected = 0
 		self.channels = [
@@ -147,6 +149,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 		self.DirectoryButton.clicked.connect(self.setCaptureDirectory)
 		self.FilenameButton.clicked.connect(self.setCaptureFilename)
 		self.SaveDataCB.stateChanged.connect(self.toggleSaveData)
+		self.VerboseCB.stateChanged.connect(self.toggleVerbose)
 		
 		self.Board0CB.stateChanged.connect(self.getBoards)
 		self.Board1CB.stateChanged.connect(self.getBoards)
@@ -219,7 +222,10 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 		self.PathRO.setText(self.path)
  			
 	def toggleSaveData(self):
-		self.savedata = not self.savedata
+		self.saveData = not self.saveData
+		
+	def toggleVerbose(self):
+		self.verbose = not self.verbose
 		
 	def selectAllChannels(self):
 		

@@ -190,9 +190,10 @@ class Mixin:
 			print("Constraint is NoneType. Did you forget to press 'Set'?")
 			return
 		
+		self.spill = SpillHolder()
 		self.stop_event = threading.Event()
 		self.workerThread = QThread()
-		self.worker = captureWorker(self.ADS_socket, self.stop_event, self.capture_type, self.constraint)
+		self.worker = captureWorker(self.ADS_socket, self.spill, self.stop_event, self.capture_type, self.constraint, self.verbose)
 		self.worker.flipStateSignal.connect(self.flipButtonStates)
 		self.workerThread.finished.connect(self.notifyFinished)
 		self.worker.moveToThread(self.workerThread)
@@ -212,8 +213,15 @@ class Mixin:
 	def notifyFinished(self):
 		
 		""" Just something to do when a thread emits a finsihed signal. """
+
+		print('Worker is finished. Here is the spill data.')
+		self.spill.parseCBLTs()
+		for cblt in self.spill.cblts:
+			bitmasks.printWordBlocks(cblt.words)
+		if self.saveData == True:
+			self.spill.constructTable()
+		print('There were %d cblts.' % len(self.spill.cblts))
 		
-		print('Worker is finished.')
 
 	@pyqtSlot()		
 	def selectDurationCapture(self):
@@ -334,13 +342,38 @@ class captureWorker(QObject):
 	
 	flipStateSignal = pyqtSignal(int)
 	
-	def __init__(self, ADS_socket, stop_event, capture_type = None, constraint = None, parent = None):
+	def __init__(self, ADS_socket, spill, stop_event, capture_type = None, constraint = None, verbose = False, parent = None):
 		super().__init__(parent)
 		super(self.__class__, self).__init__(parent)
 		self.ADS_socket = ADS_socket
 		self.stop_event = stop_event
 		self.capture_type = capture_type
 		self.constraint = constraint
+		self.verbose = verbose
+		self.spill = spill
+		
+		self.statement1CS = None
+		self.statement1UR = None
+		self.statement2US = None
+		self.statement3UR = None
+		self.statement4US = None
+		self.statement5UR = None
+		self.statement6US = None
+		self.statement7UR = None
+		self.statement8US = None
+		self.statement9UR = None
+		
+		if self.verbose:
+			self.statement1CS = '1C-S Sent Value: %d with length %d (CBLT command request).'
+			self.statement1UR = '1U-R Received Value: %d of length %d (First Rendevous.)'
+			self.statement2US = '2U-S Sent Value: %d with length %d (Constraint Send).'
+			self.statement3UR = '3U-R Received Value: %d with length %d (CBLT Status Rendevous).'
+			self.statement4US = '4U-S Received Value: %d with length %d (Send nwords Rendevous).'
+			self.statement5UR = '5U-R Received Value: %d of length %d (nwords)'
+			self.statement6US = '6U-S Sent Value: %d with length %d (nwords Rendevous).'
+			self.statement7UR = '7U-R Received Value: %d and length %d (CBLT bytes)'
+			self.statement8US = '8U-S Sent Value: %d with length %d (CBLT complete Rendevous).'
+			self.statement9UR = '9U-R Received Value: %d of length %d (Continue Rendevous)\n'
 		
 	def checkForStopEvent(self, **kwargs):
 		
@@ -370,12 +403,15 @@ class captureWorker(QObject):
 		
 		self.flipStateSignal.emit(self.capture_type)
 
-		self.ADS_socket.sendCommandToServer(self.capture_type, 1, '1C-S Sent Value: %d with length %d (CBLT command request).')
+		self.ADS_socket.sendCommandToServer(self.capture_type, 1, self.statement1CS)
 
-		server_rendevous = self.ADS_socket.receiveCommandFromServer(1, '1U-R Received Value: %d of length %d (First Rendevous.)')
+			
 
+		server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement1UR)
+
+			
 		if server_rendevous == g.RENDEVOUS_PROCEED:
-			self.ADS_socket.sendCommandToServer(self.constraint, self.constraint_size, '2U-S Sent Value: %d with length %d (Constraint Send).')
+			self.ADS_socket.sendCommandToServer(self.constraint, self.constraint_size, self.statement2US)
 		else:
 			print('Got %d for server constraint rendevous. Returning.' % server_rendevous)
 			self.flipStateSignal.emit(self.capture_type) #Turn the buttons back on on a premature ending.
@@ -389,37 +425,37 @@ class captureWorker(QObject):
 		#ends the while loop normally for server initiated stops (i.e. reaching the constraint).
 		try:
 			while not self.stop_event.isSet():
-				
-				server_rendevous = self.ADS_socket.receiveCommandFromServer(1, '3U-R Received Value: %d with length %d (CBLT Status Rendevous).')
+				server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement3UR)
 				if server_rendevous != g.RENDEVOUS_PROCEED:
 					print('Got bad rendevous from server. Breaking.')
 					self.flipStateSignal.emit(self.capture_type)
 					return
-				self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, '4U-S Received Value: %d with length %d (Send nwords Rendevous).')				
+				self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement4US)				
 				
 				
-				nwords = self.ADS_socket.receiveCommandFromServer(4, '5U-R Received Value: %d of length %d (nwords)')
+				nwords = self.ADS_socket.receiveCommandFromServer(4, self.statement5UR)
 	
-				self.checkForStopEvent(statement = '6U-S Sent Value: %d with length %d (nwords Rendevous).')
+				self.checkForStopEvent(statement = self.statement6US)
 				
-				cblt_data, raw_data = self.ADS_socket.recv_all(nwords, '7U-R Received Value: %d and length %d (CBLT bytes)') #raw is the bytearray, cblt the numpy array.
-				this_capture = CBLTData(raw_data)
-				this_capture.wordifyBinaryData()
-				bitmasks.printWordBlocks(this_capture.words)
-				sys.stdout.flush()				
+				cblt_data, raw_data = self.ADS_socket.recv_all(nwords, self.statement7UR) #raw is the bytearray, cblt the numpy array.
+				#this_capture = CBLTData(raw_data)
+				#this_capture.wordifyBinaryData()
+				#bitmasks.printWordBlocks(this_capture.words)
+				#sys.stdout.flush()				
 				#if self.savedata == True:
 				#	raw_file.write(raw_data)
+				
+
+				self.spill.addBinary(raw_data)
 	
-				self.checkForStopEvent(statement = '8U-S Sent Value: %d with length %d (CBLT complete Rendevous).')
+				self.checkForStopEvent(statement = self.statement8US)
 				
-				server_rendevous = self.ADS_socket.receiveCommandFromServer(4, '9U-R Received Value: %d of length %d (Continue Rendevous)')
+				server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement9UR) #This was 4, why? Changed to 1 10/5
 				
-				if server_rendevous == g.RENDEVOUS_PROCEED:
-					print('Server indicates proceed. Continuing.')
-				elif server_rendevous == g.RENDEVOUS_HALT:
+				if server_rendevous == g.RENDEVOUS_HALT:
 					print('Server indicates halt. Stopping.')
 					self.stop_event.set()
-				else:
+				elif server_rendevous != g.RENDEVOUS_PROCEED:
 					print('Got %d for server continue rendevous. Returning.' % server_rendevous)
 					self.flipStateSignal.emit(self.capture_type)
 					return #Added as after thought, test this if there is a bug.
@@ -496,6 +532,10 @@ class SpillHolder:
 	
 	def addCBLT(self, CBLT):
 		
+		self.cblts.append(CBLT)
+		
+	def addBinary(self, binary_data):
+		CBLT = CBLTData(binary_data)
 		self.cblts.append(CBLT)
 		
 		
@@ -619,7 +659,8 @@ class SpillHolder:
 				columns.append(cx4)
 
 		t = fits.BinTableHDU.from_columns(columns)
-		t.writeto('/nfs/optimus/home/zdhughes/Desktop/projects/APT/traceAnalysis/gui/data/test.fits')
+		subprocess.call('mkdir -p /nfs/optimus/home/zdhughes/Desktop/projects/ADS/data/', shell=True)
+		t.writeto('/nfs/optimus/home/zdhughes/Desktop/projects/ADS/data/test.fits', overwrite=True)
 		
 		
 class fitsTable:

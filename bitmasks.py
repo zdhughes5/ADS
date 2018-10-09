@@ -219,9 +219,9 @@ def getWordIndicies(words, wordsPerChannel = None):
 	foundLocations = clkLocations + fadcLocations + otherLocations + dataLocations + areaLocations
 
 	lastBoardLocation = [x for x in indexArray if x not in foundLocations]
-	if len(lastBoardLocation) != 1:
-		print('Error: Number of last board status location not 1.')
-		print(lastBoardLocation)
+#	if len(lastBoardLocation) != 1:
+#		print('Error: Number of last board status location not 1.')
+#		print(lastBoardLocation)
 
 	totalLocations = foundLocations + lastBoardLocation
 	duplicates = set([x for x in totalLocations if totalLocations.count(x) > 1])
@@ -258,8 +258,8 @@ def printWordBlocks(words, colorText = True, wordsPerChannel = None):
 		else:
 			 print(hexed, end = ' ')
 		if (i+1) % 8 == 0:
- 			print('')	
-	
+			print('')
+	print('')
 
 
 

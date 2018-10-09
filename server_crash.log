@@ -1,0 +1,13 @@
+3T-S Sent Value: 1 with length 1 (CBLT Status Rendevous).
+4T-R Received Value: 1 with length 1 (Send nwords Rendevous).
+5T-S Sent Value: 529 with length 4 (nwords value).
+6T-R Received Value: 1 with length 1 (Send CBLT Rendevous).
+7T-S Sent Value: 2116 with length 2116 (CBLT data).
+8T-R Received Value: 1 with 1 bytes (CBLT complete Rendevous)
+240.639000 ms have passed. There are 2759.361000 ms left.
+9T-S Sent Value: 1 with 1 bytes (Time Rendevous)
+
+libfadc: libfadc: fadc_cblt: bad cblt size header: 0x10100f0f
+3T-S Sent Value: 0 with length 1 (CBLT Status Rendevous).
+Got bad value for returned_nwords: -3 . Breaking.
+107 events transfered.

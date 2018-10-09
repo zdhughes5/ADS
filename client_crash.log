@@ -1,0 +1,22 @@
+8U-S Sent Value: 1 with length 1 (CBLT complete Rendevous).
+9U-R Received Value: 1 of length 1 (Continue Rendevous)
+
+3U-R Received Value: 0 with length 1 (CBLT Status Rendevous).
+Got bad rendevous from server. Breaking.
+Worker is finished. Here is the spill data.
+Traceback (most recent call last):
+  File "/nfs/optimus/home/zdhughes/Desktop/projects/ADS/Capture.py", line 218, in notifyFinished
+    self.spill.parseCBLTs()
+  File "/nfs/optimus/home/zdhughes/Desktop/projects/ADS/Capture.py", line 540, in parseCBLTs
+    cblt.parseWords()
+AttributeError: 'bytes' object has no attribute 'parseWords'
+
+If you suspect this is an IPython bug, please report it at:
+    https://github.com/ipython/ipython/issues
+or send an email to the mailing list at ipython-dev@python.org
+
+You can print a more detailed traceback right now with "%tb", or use "%debug"
+to interactively debug it.
+
+Extra-detailed tracebacks for bug-reporting purposes can be enabled via:
+    %config Application.verbose_crash=True
