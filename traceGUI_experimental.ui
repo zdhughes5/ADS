@@ -1312,7 +1312,7 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>391</width>
+             <width>375</width>
              <height>1042</height>
             </rect>
            </property>
@@ -1331,7 +1331,6 @@
                 <height>1024</height>
                </size>
               </property>
-              <zorder>ControlTab</zorder>
              </widget>
             </item>
            </layout>
@@ -1349,7 +1348,7 @@
           <property name="currentIndex">
            <number>0</number>
           </property>
-          <widget class="QWidget" name="AcquireTab" native="true">
+          <widget class="QWidget" name="AcquireTab">
            <attribute name="title">
             <string>Acquire</string>
            </attribute>
@@ -1561,7 +1560,20 @@
               <item row="7" column="0">
                <layout class="QVBoxLayout" name="verticalLayout_7">
                 <item>
+                 <widget class="QCheckBox" name="RereadCB">
+                  <property name="enabled">
+                   <bool>false</bool>
+                  </property>
+                  <property name="text">
+                   <string>Enable Reread</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
                  <widget class="QCheckBox" name="VerboseCB">
+                  <property name="enabled">
+                   <bool>false</bool>
+                  </property>
                   <property name="text">
                    <string>Verbose</string>
                   </property>
@@ -1872,8 +1884,8 @@
                 <rect>
                  <x>0</x>
                  <y>0</y>
-                 <width>509</width>
-                 <height>1559</height>
+                 <width>525</width>
+                 <height>1189</height>
                 </rect>
                </property>
                <layout class="QGridLayout" name="gridLayout_8">
@@ -2203,16 +2215,6 @@
                     </item>
                    </layout>
                   </item>
-                  <item row="14" column="1">
-                   <widget class="QLineEdit" name="lineEdit_17"/>
-                  </item>
-                  <item row="15" column="0">
-                   <widget class="QLabel" name="label_16">
-                    <property name="text">
-                     <string>TextLabel</string>
-                    </property>
-                   </widget>
-                  </item>
                   <item row="10" column="0">
                    <widget class="QLabel" name="FADCModeLabel">
                     <property name="text">
@@ -2222,6 +2224,9 @@
                      <set>Qt::AlignCenter</set>
                     </property>
                    </widget>
+                  </item>
+                  <item row="1" column="1">
+                   <widget class="QLineEdit" name="DataOffsetSet"/>
                   </item>
                   <item row="0" column="0">
                    <widget class="QLabel" name="DataWidthLabel">
@@ -2233,12 +2238,8 @@
                     </property>
                    </widget>
                   </item>
-                  <item row="11" column="2">
-                   <layout class="QVBoxLayout" name="verticalLayout_22">
-                    <item>
-                     <widget class="QLineEdit" name="lineEdit_39"/>
-                    </item>
-                   </layout>
+                  <item row="3" column="1">
+                   <widget class="QLineEdit" name="AreaOffsetSet"/>
                   </item>
                   <item row="6" column="0">
                    <widget class="QLabel" name="HILOWidthLabel">
@@ -2250,24 +2251,6 @@
                     </property>
                    </widget>
                   </item>
-                  <item row="15" column="3">
-                   <layout class="QVBoxLayout" name="verticalLayout_41">
-                    <item>
-                     <widget class="QPushButton" name="pushButton_32">
-                      <property name="text">
-                       <string>PushButton</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
-                     <widget class="QPushButton" name="pushButton_31">
-                      <property name="text">
-                       <string>PushButton</string>
-                      </property>
-                     </widget>
-                    </item>
-                   </layout>
-                  </item>
                   <item row="4" column="2">
                    <layout class="QVBoxLayout" name="verticalLayout_15">
                     <item>
@@ -2278,30 +2261,6 @@
                      </widget>
                     </item>
                    </layout>
-                  </item>
-                  <item row="14" column="3">
-                   <layout class="QVBoxLayout" name="verticalLayout_40">
-                    <item>
-                     <widget class="QPushButton" name="pushButton_30">
-                      <property name="text">
-                       <string>PushButton</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
-                     <widget class="QPushButton" name="pushButton_29">
-                      <property name="text">
-                       <string>PushButton</string>
-                      </property>
-                     </widget>
-                    </item>
-                   </layout>
-                  </item>
-                  <item row="1" column="1">
-                   <widget class="QLineEdit" name="DataOffsetSet"/>
-                  </item>
-                  <item row="3" column="1">
-                   <widget class="QLineEdit" name="AreaOffsetSet"/>
                   </item>
                   <item row="8" column="2">
                    <layout class="QVBoxLayout" name="verticalLayout_19">
@@ -2332,21 +2291,14 @@
                     </item>
                    </layout>
                   </item>
-                  <item row="12" column="1">
-                   <widget class="QLineEdit" name="lineEdit_15"/>
-                  </item>
-                  <item row="13" column="0">
-                   <widget class="QLabel" name="label_14">
-                    <property name="text">
-                     <string>TextLabel</string>
-                    </property>
-                   </widget>
-                  </item>
                   <item row="9" column="1">
                    <widget class="QLineEdit" name="ZSLSet"/>
                   </item>
                   <item row="6" column="1">
                    <widget class="QLineEdit" name="HILOWidthSet"/>
+                  </item>
+                  <item row="4" column="1">
+                   <widget class="QLineEdit" name="RereadWidthSet"/>
                   </item>
                   <item row="5" column="0">
                    <widget class="QLabel" name="RereadOffsetLabel">
@@ -2369,9 +2321,6 @@
                     </item>
                    </layout>
                   </item>
-                  <item row="4" column="1">
-                   <widget class="QLineEdit" name="RereadWidthSet"/>
-                  </item>
                   <item row="6" column="2">
                    <layout class="QVBoxLayout" name="verticalLayout_17">
                     <item>
@@ -2380,13 +2329,6 @@
                        <bool>false</bool>
                       </property>
                      </widget>
-                    </item>
-                   </layout>
-                  </item>
-                  <item row="13" column="2">
-                   <layout class="QVBoxLayout" name="verticalLayout_24">
-                    <item>
-                     <widget class="QLineEdit" name="lineEdit_43"/>
                     </item>
                    </layout>
                   </item>
@@ -2436,16 +2378,6 @@
                     </item>
                    </layout>
                   </item>
-                  <item row="13" column="1">
-                   <widget class="QLineEdit" name="lineEdit_16"/>
-                  </item>
-                  <item row="14" column="0">
-                   <widget class="QLabel" name="label_15">
-                    <property name="text">
-                     <string>TextLabel</string>
-                    </property>
-                   </widget>
-                  </item>
                   <item row="1" column="3">
                    <layout class="QVBoxLayout" name="verticalLayout_27">
                     <item>
@@ -2464,13 +2396,6 @@
                     </item>
                    </layout>
                   </item>
-                  <item row="11" column="0">
-                   <widget class="QLabel" name="label_12">
-                    <property name="text">
-                     <string>TextLabel</string>
-                    </property>
-                   </widget>
-                  </item>
                   <item row="5" column="2">
                    <layout class="QVBoxLayout" name="verticalLayout_16">
                     <item>
@@ -2482,8 +2407,8 @@
                     </item>
                    </layout>
                   </item>
-                  <item row="11" column="1">
-                   <widget class="QLineEdit" name="lineEdit_14"/>
+                  <item row="10" column="1">
+                   <widget class="QLineEdit" name="lineEdit_13"/>
                   </item>
                   <item row="0" column="3">
                    <layout class="QVBoxLayout" name="verticalLayout_10">
@@ -2503,12 +2428,8 @@
                     </item>
                    </layout>
                   </item>
-                  <item row="12" column="0">
-                   <widget class="QLabel" name="label_13">
-                    <property name="text">
-                     <string>TextLabel</string>
-                    </property>
-                   </widget>
+                  <item row="5" column="1">
+                   <widget class="QLineEdit" name="RereadOffsetSet"/>
                   </item>
                   <item row="4" column="3">
                    <layout class="QVBoxLayout" name="verticalLayout_30">
@@ -2528,12 +2449,6 @@
                     </item>
                    </layout>
                   </item>
-                  <item row="10" column="1">
-                   <widget class="QLineEdit" name="lineEdit_13"/>
-                  </item>
-                  <item row="5" column="1">
-                   <widget class="QLineEdit" name="RereadOffsetSet"/>
-                  </item>
                   <item row="4" column="0">
                    <widget class="QLabel" name="RereadWidthLabel">
                     <property name="text">
@@ -2544,23 +2459,8 @@
                     </property>
                    </widget>
                   </item>
-                  <item row="13" column="3">
-                   <layout class="QVBoxLayout" name="verticalLayout_39">
-                    <item>
-                     <widget class="QPushButton" name="pushButton_28">
-                      <property name="text">
-                       <string>PushButton</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
-                     <widget class="QPushButton" name="pushButton_27">
-                      <property name="text">
-                       <string>PushButton</string>
-                      </property>
-                     </widget>
-                    </item>
-                   </layout>
+                  <item row="8" column="1">
+                   <widget class="QLineEdit" name="CFDThreshSet"/>
                   </item>
                   <item row="9" column="0">
                    <widget class="QLabel" name="ZSLLabel">
@@ -2612,6 +2512,9 @@
                     </item>
                    </layout>
                   </item>
+                  <item row="2" column="1">
+                   <widget class="QLineEdit" name="AreaWidthSet"/>
+                  </item>
                   <item row="2" column="0">
                    <widget class="QLabel" name="AreaWidthLabel">
                     <property name="text">
@@ -2622,27 +2525,10 @@
                     </property>
                    </widget>
                   </item>
-                  <item row="8" column="1">
-                   <widget class="QLineEdit" name="CFDThreshSet"/>
-                  </item>
-                  <item row="15" column="2">
-                   <layout class="QVBoxLayout" name="verticalLayout_26">
-                    <item>
-                     <widget class="QLineEdit" name="lineEdit_48"/>
-                    </item>
-                   </layout>
-                  </item>
                   <item row="0" column="1">
                    <layout class="QHBoxLayout" name="horizontalLayout_13">
                     <item>
                      <widget class="QLineEdit" name="DataWidthSet"/>
-                    </item>
-                   </layout>
-                  </item>
-                  <item row="14" column="2">
-                   <layout class="QVBoxLayout" name="verticalLayout_25">
-                    <item>
-                     <widget class="QLineEdit" name="lineEdit_45"/>
                     </item>
                    </layout>
                   </item>
@@ -2663,30 +2549,6 @@
                      </widget>
                     </item>
                    </layout>
-                  </item>
-                  <item row="11" column="3">
-                   <layout class="QVBoxLayout" name="verticalLayout_37">
-                    <item>
-                     <widget class="QPushButton" name="pushButton_24">
-                      <property name="text">
-                       <string>PushButton</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
-                     <widget class="QPushButton" name="pushButton_23">
-                      <property name="text">
-                       <string>PushButton</string>
-                      </property>
-                     </widget>
-                    </item>
-                   </layout>
-                  </item>
-                  <item row="2" column="1">
-                   <widget class="QLineEdit" name="AreaWidthSet"/>
-                  </item>
-                  <item row="15" column="1">
-                   <widget class="QLineEdit" name="lineEdit_18"/>
                   </item>
                   <item row="3" column="0">
                    <widget class="QLabel" name="AreaOffsetLabel">
@@ -2747,24 +2609,6 @@
                     </property>
                    </widget>
                   </item>
-                  <item row="12" column="3">
-                   <layout class="QVBoxLayout" name="verticalLayout_38">
-                    <item>
-                     <widget class="QPushButton" name="pushButton_26">
-                      <property name="text">
-                       <string>PushButton</string>
-                      </property>
-                     </widget>
-                    </item>
-                    <item>
-                     <widget class="QPushButton" name="pushButton_25">
-                      <property name="text">
-                       <string>PushButton</string>
-                      </property>
-                     </widget>
-                    </item>
-                   </layout>
-                  </item>
                   <item row="3" column="2">
                    <layout class="QVBoxLayout" name="verticalLayout_14">
                     <item>
@@ -2773,13 +2617,6 @@
                        <bool>false</bool>
                       </property>
                      </widget>
-                    </item>
-                   </layout>
-                  </item>
-                  <item row="12" column="2">
-                   <layout class="QVBoxLayout" name="verticalLayout_23">
-                    <item>
-                     <widget class="QLineEdit" name="lineEdit_41"/>
                     </item>
                    </layout>
                   </item>

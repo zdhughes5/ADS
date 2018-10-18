@@ -158,7 +158,7 @@ def extractWordsPerChannel(words):
 		print('Dumping words:')
 		for i, word in enumerate(words):
 			hexed = '0x%08x' % word
-			print(hexed, sep='')
+			print(hexed, end=' ')
 			if (i+1) % 8 == 0:
 				print('')	
 		

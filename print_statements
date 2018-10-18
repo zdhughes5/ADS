@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Oct 12 15:08:27 2018
+
+@author: zdhughes
+"""
+
+#define STATEMENT1CR "1F-R Received Value: %d with length %d (Command Request).\n"
+
+#define STATEMENT1NS "1N-S Sent Value: %d with length %d (CBLT Status Rendevous).\n"
+#define STATEMENT2NR "2N-R Received Value: %d with length %d (Send nwords Rendevous).\n"
+#define STATEMENT3NS "3N-S Sent Value: %d with length %d (nwords value).\n"
+#define STATEMENT4NR "4N-R Received Value: %d with length %d (Send CBLT Rendevous).\n"
+#define STATEMENT5NS "5N-S Sent Value: %d with length %d (CBLT data).\n"
+#define STATEMENT6NR "6N-R Received Value: %d with length %d (CBLT complete Rendevous).\n"
+
+#define STATEMENT1TS "1T-S Sent Value: %d with %d bytes (Duration OK Rendevous).\n"
+#define STATEMENT2TR "2T-R Received Value: %d with %d bytes (Duration int).\n"
+#define STATEMENT3TS "3T-S Sent Value: %d with length %d (CBLT Status Rendevous).\n"
+#define STATEMENT4TR "4T-R Received Value: %d with length %d (Send nwords Rendevous).\n"
+#define STATEMENT5TS "5T-S Sent Value: %d with length %d (nwords value).\n"
+#define STATEMENT6TR "6T-R Received Value: %d with length %d (Send CBLT Rendevous).\n"
+#define STATEMENT7TS "7T-S Sent Value: %d with length %d (CBLT data).\n"
+#define STATEMENT8TR "8T-R Received Value: %d with %d bytes (CBLT complete Rendevous)\n"
+#define STATEMENT9TS "9T-S Sent Value: %d with %d bytes (Time Rendevous)\n\n"
+
+#define STATEMENT1ES "1E-S Sent Value: %d with %d bytes (Event OK Rendevous).\n"
+#define STATEMENT2ER "2E-R Received Value: %d with %d bytes (Event int).\n"
+#define STATEMENT3ES "3E-S Sent Value: %d with length %d (CBLT Status Rendevous).\n"
+#define STATEMENT4ER "4E-R Received Value: %d with length %d (Send nwords Rendevous).\n"
+#define STATEMENT5ES "5E-S Sent Value: %d with length %d (nwords value).\n"
+#define STATEMENT6ER "6E-R Received Value: %d with length %d (Send CBLT Rendevous).\n"
+#define STATEMENT7ES "7E-S Sent Value: %d with length %d (CBLT data).\n"
+#define STATEMENT8ER "8E-R Received Value: %d with %d bytes (CBLT complete Rendevous)\n"
+#define STATEMENT9ES "9E-S Sent Value: %d with %d bytes (Event Rendevous)\n"
+
+#define STATEMENT1CS "1C-S Sent Value: %d with %d bytes (Continuous OK Rendevous).\n"
+#define STATEMENT2CR "2C-R Received Value: %d with %d bytes (Reply OK Rendevous).\n"
+#define STATEMENT3CS "3C-S Sent Value: %d with length %d (CBLT Status Rendevous).\n"
+#define STATEMENT4CR "4C-R Received Value: %d with length %d (Send nwords Rendevous).\n"
+#define STATEMENT5CS "5C-S Sent Value: %d with length %d (nwords value).\n"
+#define STATEMENT6CR "6C-R Received Value: %d with length %d (Send CBLT Rendevous).\n"
+#define STATEMENT7CS "7C-S Sent Value: %d with length %d (CBLT data).\n"
+#define STATEMENT8CR "8C-R Received Value: %d with %d bytes (CBLT complete Rendevous)\n"
+#define STATEMENT9CS "9C-S Sent Value: %d with %d bytes (Continue Rendevous)\n"
+
+#define STATEMENT1AS "1A-S Sent Value: %d with %d bytes (Automated OK Rendevous).\n"
+#define STATEMENT2AR "2A-R Received Value: %d with %d bytes (Timeout Value).\n"
+#define STATEMENT3AS "3A-S Sent Value: %d with %d bytes (HALT Rendevous)\n"
+#define STATEMENT4AR "4A-R Received Value: %d with length %d (Send nwords Rendevous).\n"
+#define STATEMENT5AS "5A-S Sent Value: %d with length %d (nwords value).\n"
+#define STATEMENT6AR "6A-R Received Value: %d with length %d (Send CBLT Rendevous).\n"
+#define STATEMENT7AS "7A-S Sent Value: %d with length %d (CBLT data).\n"
+#define STATEMENT8AR "8A-R Received Value: %d with %d bytes (CBLT complete Rendevous)\n"
+#define STATEMENT9AS "9A-S Sent Value: %d with %d bytes (Continue Rendevous)\n"
+
+#define STATEMENT1GS "1G-S Sent Value: %d with %d bytes (Getter OK Rendevous).\n"
+#define STATEMENT2GR "2G-R Received Value: %d with %d bytes (Send Value Rendevous).\n"
+#define STATEMENT3GS "3G-S Sent Value: %d with %d bytes (Parameter Send).\n"
+#define STATEMENT4GS "4G-R Received Value: %d with %d bytes (Got Parameter Rendevous).\n"
+#define STATEMENT5GR "5G-S Sent Value: %d with %d bytes (Continue Rendevous).\n"
+
+
+#define STATEMENT1SS "1S-S Sent Value: %d with %d bytes (Setter OK Rendevous).\n"
+#define STATEMENT1SR "2S-R Received Value: %d with %d bytes (Send channels).\n"
+#define STATEMENT3SS "3S-S Sent Value: %d with %d bytes (Boards OK Rendevous).\n"
+#define STATEMENT4SR "4S-R Received Value: %d with %d bytes (Send Value).\n"
+#define STATEMENT5SS "5S-R Sent Value: %d with %d bytes (Setter Complete Rendevous).\n"
+
+

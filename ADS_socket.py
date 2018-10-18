@@ -34,22 +34,24 @@ class ADS_socket(QObject):
 			This does it. """
 		
 		bytes_received = 0
-		dt = np.dtype('i4') #8->4
-		dt = dt.newbyteorder('=')
 		message = b''
 		
 		while bytes_received < nwords*4: #8->4
 		
+			#raw, ancdata, msg_flags, address = self.s.recvmsg(nwords*4, 1000)
 			raw = self.s.recv(nwords*4) #8->4
 			bytes_received += len(raw)
 			message += raw
 	
-		translated_data = np.frombuffer(message, dtype=dt)	
 		
 		if statement is not None:
 			print(statement % (len(message), len(message))) # The server side prints expected and actual sent bytes. The Client only has received. Repeat for parity of printouts.
+		#print(ancdata)
+		#print(msg_flags)
+		#print(address)
 		
-		return translated_data, message
+		
+		return message
 	
 	def sendCommandToServer(self, outgoing_command, byte_length=1, statement=None):
 		

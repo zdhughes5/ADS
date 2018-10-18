@@ -57,7 +57,9 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 		self.filename = None
 		self.spill = None
 		self.saveData = self.SaveDataCB.isChecked()
+		#self.verbose = True
 		self.verbose = self.VerboseCB.isChecked()
+		self.reread = self.RereadCB.isChecked()
 		
 		self.channelsSelected = 0
 		self.channels = [
@@ -188,6 +190,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 		self.Channel29CB.stateChanged.connect(self.getChannels)
 		self.SelectAllChannelsCB.stateChanged.connect(self.selectAllChannels)
 		
+		self.RereadCB.stateChanged.connect(self.toggleReread)
+		
 		#Simulation tab.
 		self.CsIPDFButton.clicked.connect(self.loadCsIPDF)
 		self.ChannelPDFButton.clicked.connect(self.loadChannelPDF)	
@@ -223,9 +227,6 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
  			
 	def toggleSaveData(self):
 		self.saveData = not self.saveData
-		
-	def toggleVerbose(self):
-		self.verbose = not self.verbose
 		
 	def selectAllChannels(self):
 		

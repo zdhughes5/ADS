@@ -38,8 +38,6 @@ class Mixin:
 
 		self.ConnectServerButton.setEnabled(False)
 		self.RereadCB.setEnabled(True)
-		self.VerboseCB.setEnabled(True)
-
 		
 	@pyqtSlot()
 	def singleEventAction(self):
@@ -71,7 +69,6 @@ class Mixin:
 			reread_nwords = self.ADS_socket.receiveCommandFromServer(4, '9S-R Sent Value: %d with length %d (reread nwords value).')
 			self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, '10S-R Received Value: %d with length %d (Send reread CBLT Rendevous).')	
 			self.raw_reread_data = self.ADS_socket.recv_all(reread_nwords, '11S-R Sent Value: %d with length %d (reread CBLT data).') #raw is the bytearray, cblt the numpy array.
-			self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, '12S-R Received Value: %d with length %d (reread CBLT compelete Rendevous).')			
 			self.this_capture_reread = CBLTData(self.raw_reread_data)
 			self.this_capture_reread.wordifyBinaryData()
 			if self.verbose:
@@ -84,7 +81,6 @@ class Mixin:
 				f.write(self.this_capture.binary_data)
 			self.fileNum += 1
 			self.updatePath()
-		print('Command Complete.')
 	
 	@pyqtSlot()	
 	def clearEventAction(self):
@@ -107,25 +103,7 @@ class Mixin:
 		else:
 			print('Got bad rendevous from server. Breaking.')
 
-		return
-	
-	@pyqtSlot()
-	def toggleVerbose(self):
-
-		
-		self.verbose = self.VerboseCB.isChecked()
-		self.ADS_socket.sendCommandToServer(g.SET_VERBOSITY, 1, '1U-S Sent Value: %d with length %d (Command Request).')
-		server_rendevous = self.ADS_socket.receiveCommandFromServer(1, '1S-R Sent Value: %d with length %d (Send status Rendevous).')
-
-		if server_rendevous == g.RENDEVOUS_PROCEED:
-			if self.VerboseCB.isChecked():
-				self.ADS_socket.sendCommandToServer(g.VERBOSE_ON, 1, '2S-S Received Value: %d with length %d (Verbose status).')
-			else:
-				self.ADS_socket.sendCommandToServer(g.VERBOSE_OFF, 1, '2S-S Received Value: %d with length %d (Verbose status).')
-		else:
-			print('Got bad rendevous from server. Breaking.')
-
-		return	
+		return		
 		
 	@pyqtSlot()
 	def universalGet(self, get_request):
@@ -227,7 +205,6 @@ class Mixin:
 		self.StartButton.setEnabled(not self.StartButton.isEnabled())
 		self.StopButton.setEnabled(not self.StartButton.isEnabled())
 		self.SingleEventButton.setEnabled(not self.SingleEventButton.isEnabled())
-		self.ClearEventButton.setEnabled(not self.ClearEventButton.isEnabled())
 		self.CloseServerButton.setEnabled(not self.CloseServerButton.isEnabled())
 		self.DurationRadio.setEnabled(not self.DurationRadio.isEnabled())
 		self.EventRadio.setEnabled(not self.EventRadio.isEnabled())
@@ -275,13 +252,13 @@ class Mixin:
 		""" Just something to do when a thread emits a finsihed signal. """
 
 		print('Worker is finished. Here is the spill data.')
-		#self.spill.parseCBLTs()
+		self.spill.parseCBLTs()
 # =============================================================================
 # 		for cblt in self.spill.cblts:
 # 			bitmasks.printWordBlocks(cblt.words)
 # =============================================================================
-		#if self.saveData == True:
-		#	self.spill.constructTable()
+		if self.saveData == True:
+			self.spill.constructTable()
 		print('There were %d cblts.' % len(self.spill.cblts))
 		
 
@@ -424,31 +401,18 @@ class captureWorker(QObject):
 		self.statement6US = None
 		self.statement7UR = None
 		self.statement8US = None
-		self.statement1RR = None
-		self.statement2RS = None
-		self.statement3RR = None
-		self.statement4RS = None
-		self.statement5RR = None
-		self.statement6RS = None
 		self.statement9UR = None
-
 		
 		if self.verbose:
 			self.statement1CS = '1C-S Sent Value: %d with length %d (CBLT command request).'
-			self.statement1UR = '1U-R Received Value: %d of length %d (Server Begin Rendevous.)'
+			self.statement1UR = '1U-R Received Value: %d of length %d (First Rendevous.)'
 			self.statement2US = '2U-S Sent Value: %d with length %d (Constraint Send).'
 			self.statement3UR = '3U-R Received Value: %d with length %d (CBLT Status Rendevous).'
-			self.statement4US = '4U-S Sent Value: %d with length %d (Send nwords Rendevous).'
+			self.statement4US = '4U-S Received Value: %d with length %d (Send nwords Rendevous).'
 			self.statement5UR = '5U-R Received Value: %d of length %d (nwords)'
 			self.statement6US = '6U-S Sent Value: %d with length %d (nwords Rendevous).'
 			self.statement7UR = '7U-R Received Value: %d and length %d (CBLT bytes)'
 			self.statement8US = '8U-S Sent Value: %d with length %d (CBLT complete Rendevous).'
-			self.statement1RR = '1R-R Received Value: %d with length %d (CBLT reread Status Rendevous).'
-			self.statement2RS = '2R-S Sent Value: %d with length %d (Send reread nwords Rendevous).'
-			self.statement3RR = '3R-R Received Value: %d with length %d (reread nwords value).'
-			self.statement4RS = '4R-S Sent Value: %d with length %d (Send reread CBLT Rendevous).'
-			self.statement5RR = '5R-R Received Value: %d with length %d (reread CBLT data).'
-			self.statement6RS = '6R-S Sent Value: %d with length %d (reread CBLT complete Rendevous).'
 			self.statement9UR = '9U-R Received Value: %d of length %d (Continue Rendevous)\n'
 		
 	def checkForStopEvent(self, **kwargs):
@@ -514,28 +478,29 @@ class captureWorker(QObject):
 				raw_data = self.ADS_socket.recv_all(nwords, self.statement7UR) #raw is the bytearray, cblt the numpy array.
 				self.spill.addBinary(raw_data)
 
-				#if self.verbose:
-				#	this_capture = CBLTData(raw_data)
-				#	this_capture.wordifyBinaryData()
-				#	bitmasks.printWordBlocks(this_capture.words)
+
+				if self.verbose:
+					this_capture = CBLTData(raw_data)
+					this_capture.wordifyBinaryData()
+					bitmasks.printWordBlocks(this_capture.words)
 
 				self.checkForStopEvent(statement = self.statement8US)				
 
 				if self.reread:
-					server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement1RR)
+					server_rendevous = self.ADS_socket.receiveCommandFromServer(1, '1R-R Received Value: %d with length %d (CBLT reread Status Rendevous).')
 					if server_rendevous != g.RENDEVOUS_PROCEED:
 						print('Got bad rendevous from server. Breaking.')
 						return			
-					self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement2RS)		
-					reread_nwords = self.ADS_socket.receiveCommandFromServer(4, self.statement3RR)
-					self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement4RS)	
-					raw_reread_data = self.ADS_socket.recv_all(reread_nwords, self.statement5RR) #raw is the bytearray, cblt the numpy array.
-					self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement6RS)	
+					self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, '2R-S Sent Value: %d with length %d (Send reread nwords Rendevous).')		
+					reread_nwords = self.ADS_socket.receiveCommandFromServer(4, '3R-R Received Value: %d with length %d (reread nwords value).')
+					self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, '4R-S Sent Value: %d with length %d (Send reread CBLT Rendevous).')	
+					raw_reread_data = self.ADS_socket.recv_all(reread_nwords, '5R-R Received Value: %d with length %d (reread CBLT data).') #raw is the bytearray, cblt the numpy array.
 					if self.verbose:
 						this_capture_reread = CBLTData(raw_reread_data)
 						this_capture_reread.wordifyBinaryData()
 						bitmasks.printWordBlocks(this_capture_reread.words)
-						
+
+				
 				server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement9UR) #This was 4, why? Changed to 1 10/5
 				
 				if server_rendevous == g.RENDEVOUS_HALT:
