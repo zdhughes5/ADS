@@ -277,6 +277,7 @@ class Mixin:
 	
 		self.spill = SpillHolder()
 		self.stop_event = mp.Event()
+		self.cont_event = mp.Event()
 		self.workerThread = QThread()
 		self.worker = captureWorker(self.ADS_socket, self.spill, self.stop_event, self.guiQueueIn, self.guiQueueOut, self.livePlot, self.plot_selection, self.capture_type, self.constraint, self.verbose, self.reread)
 		self.worker.flipStateSignal.connect(self.flipButtonStates)
@@ -317,6 +318,7 @@ class Mixin:
 		""" Sets the capture thread stop_event to True. """
 		
 		self.stop_event.set()
+		self.cont_event.set()
 
 	@pyqtSlot()		
 	def notifyFinished(self):
@@ -345,6 +347,14 @@ class Mixin:
 			
 		print('There were %d cblts.' % len(self.spill.cblts))
 		self.flipButtonStates(self.capture_type)
+		
+		print(self.cont_event.is_set())
+		print(self.capture_type)
+		print(g.EVENT_CBLT )
+		
+		if self.capture_type == g.EVENT_CBLT and self.cont_event.is_set() == False:
+			print('Rerunning')
+			self.startAcquire()
 
 	@pyqtSlot()		
 	def selectDurationCapture(self):
