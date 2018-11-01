@@ -699,14 +699,329 @@ class SpillHolder:
 		
 		
 		
-	
+	@pyqtSlot()
+	def startAcquire(self):
+		
+		if self.constraint == None:
+			print("Constraint is NoneType. Did you forget to press 'Set'?")
+			return
+		
+		self.spill = SpillHolder()
+		self.stop_event = mp.Event()
+		self.workerThread = QThread()
+		self.worker = captureWorker(self.ADS_socket, self.spill, self.stop_event, self.capture_type, self.constraint, self.verbose, self.reread)
+		self.worker.flipStateSignal.connect(self.flipButtonStates)
+		self.workerThread.finished.connect(self.notifyFinished)
+		self.worker.moveToThread(self.workerThread)
+		self.workerThread.started.connect(self.worker.universalCapture)
+		self.workerThread.start()
+		self.workerThread.quit() #Be careful with this, will it prematurely end the thread? Without it
+		#we get 'QThread: Destroyed while thread is still running'. Memory Leak?	
 
 			
+class captureWorker(QObject):
+	
+	""" This object does the actual non-single-event capture. It is run in a seperate QThread. """
+	
+	flipStateSignal = pyqtSignal(int)
+	
+	def __init__(self, ADS_socket, spill, stop_event, capture_type = None, constraint = None, verbose = False, reread = False, parent = None):
+		print('WorkerStarted')
+		super().__init__(parent)
+		super(self.__class__, self).__init__(parent)
+		self.ADS_socket = ADS_socket
+		self.stop_event = stop_event
+		self.capture_type = capture_type
+		self.constraint = constraint
+		self.verbose = verbose
+		self.reread = reread
+		self.spill = spill
 		
+		self.statement1CS = None
+		self.statement1UR = None
+		self.statement2US = None
+		self.statement3UR = None
+		self.statement4US = None
+		self.statement5UR = None
+		self.statement6US = None
+		self.statement7UR = None
+		self.statement8US = None
+		self.statement1RR = None
+		self.statement2RS = None
+		self.statement3RR = None
+		self.statement4RS = None
+		self.statement5RR = None
+		self.statement6RS = None
+		self.statement9UR = None
+
+		
+		if self.verbose:
+			self.statement1CS = '1C-S Sent Value: %d with length %d (CBLT command request).'
+			self.statement1UR = '1U-R Received Value: %d of length %d (Server Begin Rendevous.)'
+			self.statement2US = '2U-S Sent Value: %d with length %d (Constraint Send).'
+			self.statement3UR = '3U-R Received Value: %d with length %d (CBLT Status Rendevous).'
+			self.statement4US = '4U-S Sent Value: %d with length %d (Send nwords Rendevous).'
+			self.statement5UR = '5U-R Received Value: %d of length %d (nwords)'
+			self.statement6US = '6U-S Sent Value: %d with length %d (nwords Rendevous).'
+			self.statement7UR = '7U-R Received Value: %d and length %d (CBLT bytes)'
+			self.statement8US = '8U-S Sent Value: %d with length %d (CBLT complete Rendevous).'
+			self.statement1RR = '1R-R Received Value: %d with length %d (CBLT reread Status Rendevous).'
+			self.statement2RS = '2R-S Sent Value: %d with length %d (Send reread nwords Rendevous).'
+			self.statement3RR = '3R-R Received Value: %d with length %d (reread nwords value).'
+			self.statement4RS = '4R-S Sent Value: %d with length %d (Send reread CBLT Rendevous).'
+			self.statement5RR = '5R-R Received Value: %d with length %d (reread CBLT data).'
+			self.statement6RS = '6R-S Sent Value: %d with length %d (reread CBLT complete Rendevous).'
+			self.statement9UR = '9U-R Received Value: %d of length %d (Continue Rendevous)\n'
+		
+	def checkForStopEvent(self, **kwargs):
+		
+		""" Checks whether the stop_event has been set by the user.
+			Based on the result it tells the server whether to halt or proceed. """
+		
+		if not self.stop_event.is_Set():
+			self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, **kwargs)
+		else:
+			self.ADS_socket.sendCommandToServer(g.RENDEVOUS_HALT, 1, **kwargs)
+			print('Sent halt, breaking.')
+			raise HaltCapture
+
+	def universalCapture(self):
+		
+		""" Starts the event capture. Capture_type is for the server cblt capture mode. 
+			Constraint is the corresponding parameter that tells the server when to stop
+			the capture. """
+			
+		if self.capture_type == g.TIMED_CBLT or self.capture_type == g.EVENT_CBLT or self.capture_type == g.AUTOMATED_CBLT:
+			self.constraint_size = 4 #For time and event constrait mode, the constraint is sent as an int
+		elif self.capture_type == g.CONTINUOUS_CBLT:
+			self.constraint_size = 1 #For continuous, it is just a rendevous check. Thus, a char.
+		else:
+			print('Bad capture_type: '+str(self.capture_type))
+			return
+		
+		self.flipStateSignal.emit(self.capture_type)
+
+		self.ADS_socket.sendCommandToServer(self.capture_type, 1, self.statement1CS)
+		
+		server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement1UR)
+
+			
+		if server_rendevous == g.RENDEVOUS_PROCEED:
+			self.ADS_socket.sendCommandToServer(self.constraint, self.constraint_size, self.statement2US)
+		else:
+			print('Got %d for server constraint rendevous. Returning.' % server_rendevous)
+			self.flipStateSignal.emit(self.capture_type) #Turn the buttons back on on a premature ending.
+			return
+	
+		server_rendevous = g.SERVER_RENDEVOUS_DEFAULT #Could use different variable, resetting it instead.
+		
+		#Functions can not break while loops. So, to use a function (reduce code redundacy/neatness) 
+		#and have it break the while loop it instead throws an exception (which travels up the calling 
+		#chain until it is handled). The stop_event 1. triggers the exception (for mid-loop breaks) and 2. 
+		#ends the while loop normally for server initiated stops (i.e. reaching the constraint).
+		try:
+			while not self.stop_event.is_Set():
+				server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement3UR)
+				if server_rendevous != g.RENDEVOUS_PROCEED:
+					print('Got bad rendevous from server. Breaking.')
+					self.flipStateSignal.emit(self.capture_type)
+					return
+				self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement4US)				
+				
+				
+				nwords = self.ADS_socket.receiveCommandFromServer(4, self.statement5UR)
+	
+				self.checkForStopEvent(statement = self.statement6US)
+				
+				raw_data = self.ADS_socket.recv_all(nwords, self.statement7UR) #raw is the bytearray, cblt the numpy array.
+				self.spill.addBinary(raw_data)
+
+				#if self.verbose:
+				#	this_capture = CBLTData(raw_data)
+				#	this_capture.wordifyBinaryData()
+				#	bitmasks.printWordBlocks(this_capture.words)
+
+				self.checkForStopEvent(statement = self.statement8US)				
+
+				if self.reread:
+					server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement1RR)
+					if server_rendevous != g.RENDEVOUS_PROCEED:
+						print('Got bad rendevous from server. Breaking.')
+						return			
+					self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement2RS)		
+					reread_nwords = self.ADS_socket.receiveCommandFromServer(4, self.statement3RR)
+					self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement4RS)	
+					raw_reread_data = self.ADS_socket.recv_all(reread_nwords, self.statement5RR) #raw is the bytearray, cblt the numpy array.
+					self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement6RS)	
+					if self.verbose:
+						this_capture_reread = CBLTData(raw_reread_data)
+						this_capture_reread.wordifyBinaryData()
+						bitmasks.printWordBlocks(this_capture_reread.words)
+						
+				server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement9UR) #This was 4, why? Changed to 1 10/5
+				
+				if server_rendevous == g.RENDEVOUS_HALT:
+					print('Server indicates halt. Stopping.')
+					self.stop_event.set()
+				elif server_rendevous != g.RENDEVOUS_PROCEED:
+					print('Got %d for server continue rendevous. Returning.' % server_rendevous)
+					self.flipStateSignal.emit(self.capture_type)
+					return #Added as after thought, test this if there is a bug.
+				server_rendevous = g.SERVER_RENDEVOUS_DEFAULT
+		except HaltCapture:
+			pass
+				
+		print('Exited while loop.')
+		self.flipStateSignal.emit(self.capture_type) #Turn the buttons back on.
+
+
+
+		while not pool_result.ready():
+			try:
+				queueItem = self.outofQueue.get(False)
+				if queueItem[0] == 'flipStateSignal':
+					self.flipStateSignal.emit(self.capture_type) #It's possible that the process ends after this line and the queus is not empty. Check at end of thread for stuff in the queue. Is the queue destroyed when the subprocess exits?
+				elif queueItem[0] == 'plotData':
+					self.guiQueue.put(queueItem)
+				elif queueItem[0] == 'spill':
+					self.guiQueue.put(queueItem)
+				else:
+					print('Have a queue item but do not know what to do with it.')
+			except queue.Empty:
+				pass
+
+			try:
+				quiQueueItem = self.guiQueue.get(False)
+				if quiQueueItem[0] == 'plotReady':
+					self.intoQueue.put(quiQueueItem)
+				else:
+					print('Have a GUI queue item but do not know what to do with it.')
+			except queue.Empty:
+				pass
+			
+		else:
+			while not self.outofQueue.empty():
+				queueItem = self.outofQueue.get(False)
+				if queueItem[0] == 'flipStateSignal':
+					self.flipStateSignal.emit(self.capture_type)
+				elif queueItem[0] == 'plotData':
+					pass
+				elif queueItem[0] == 'spill':
+					self.guiQueue.put(queueItem)
+				else:
+					print('Have a queue item but do not know what to do with it.')
+		print(pool_result.ready())
+		pool.join()
+		print('joined')		
 
 		
 		
 		
+				print('IT')
+				print(guiQueueItem)
+				#bitmasks.printWordBlocks(guiQueueItem[1].words)
+				self.FADCPlotWidget.canvas.ax0.clear()
+				self.FADCPlotWidget.canvas.ax1.clear()
+				self.FADCPlotWidget.canvas.ax2.clear()
+				self.FADCPlotWidget.canvas.ax3.clear()
+				self.FADCPlotWidget.canvas.ax4.clear()
+				self.FADCPlotWidget.canvas.ax5.clear()
+				self.FADCPlotWidget.canvas.ax6.clear()
+				self.FADCPlotWidget.canvas.ax7.clear()
+				self.FADCPlotWidget.canvas.ax8.clear()
+				self.FADCPlotWidget.canvas.ax9.clear()
+				self.FADCPlotWidget.canvas.ax10.clear()
+				self.FADCPlotWidget.canvas.ax11.clear()
+				self.FADCPlotWidget.canvas.ax12.clear()
+				self.FADCPlotWidget.canvas.ax13.clear()
+				self.FADCPlotWidget.canvas.ax14.clear()
+				self.FADCPlotWidget.canvas.ax15.clear()
+				self.FADCPlotWidget.canvas.ax16.clear()
+				self.FADCPlotWidget.canvas.ax17.clear()
+				self.FADCPlotWidget.canvas.ax18.clear()
+				self.FADCPlotWidget.canvas.ax19.clear()
+				self.FADCPlotWidget.canvas.ax20.clear()
+				self.FADCPlotWidget.canvas.ax21.clear()
+				self.FADCPlotWidget.canvas.ax22.clear()
+				self.FADCPlotWidget.canvas.ax23.clear()
+				self.FADCPlotWidget.canvas.ax24.clear()
+				self.FADCPlotWidget.canvas.ax25.clear()
+				self.FADCPlotWidget.canvas.ax26.clear()
+				self.FADCPlotWidget.canvas.ax27.clear()
+				self.FADCPlotWidget.canvas.ax28.clear()
+				self.FADCPlotWidget.canvas.ax29.clear()
+
+				self.FADCPlotWidget.canvas.ax0.plot(guiQueueItem[1].boards[1]['Channel 0']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax1.plot(guiQueueItem[1].boards[1]['Channel 1']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax2.plot(guiQueueItem[1].boards[1]['Channel 2']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax3.plot(guiQueueItem[1].boards[1]['Channel 3']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax4.plot(guiQueueItem[1].boards[1]['Channel 4']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax5.plot(guiQueueItem[1].boards[1]['Channel 5']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax6.plot(guiQueueItem[1].boards[1]['Channel 6']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax7.plot(guiQueueItem[1].boards[1]['Channel 7']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax8.plot(guiQueueItem[1].boards[1]['Channel 8']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax9.plot(guiQueueItem[1].boards[1]['Channel 9']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax10.plot(guiQueueItem[1].boards[2]['Channel 0']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax11.plot(guiQueueItem[1].boards[2]['Channel 1']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax12.plot(guiQueueItem[1].boards[2]['Channel 2']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax13.plot(guiQueueItem[1].boards[2]['Channel 3']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax14.plot(guiQueueItem[1].boards[2]['Channel 4']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax15.plot(guiQueueItem[1].boards[2]['Channel 5']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax16.plot(guiQueueItem[1].boards[2]['Channel 6']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax17.plot(guiQueueItem[1].boards[2]['Channel 7']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax18.plot(guiQueueItem[1].boards[2]['Channel 8']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax19.plot(guiQueueItem[1].boards[2]['Channel 9']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax20.plot(guiQueueItem[1].boards[3]['Channel 0']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax21.plot(guiQueueItem[1].boards[3]['Channel 1']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax22.plot(guiQueueItem[1].boards[3]['Channel 2']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax23.plot(guiQueueItem[1].boards[3]['Channel 3']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax24.plot(guiQueueItem[1].boards[3]['Channel 4']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax25.plot(guiQueueItem[1].boards[3]['Channel 5']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax26.plot(guiQueueItem[1].boards[3]['Channel 6']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax27.plot(guiQueueItem[1].boards[3]['Channel 7']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax28.plot(guiQueueItem[1].boards[3]['Channel 8']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax29.plot(guiQueueItem[1].boards[3]['Channel 9']['ADC'], color='black')
+				self.FADCPlotWidget.canvas.ax0.set_title('Live ADC Plot')
+				self.FADCPlotWidget.canvas.ax0.set_xlabel('Sample')
+				self.FADCPlotWidget.canvas.ax0.set_ylabel('Count')
+				self.FADCPlotWidget.canvas.draw()
+				print(guiQueueItem[1].boards[1]['Channel 1']['ADC'])
+				print('WORKS!!!!!!!!!')
+				
+	@pyqtSlot()		
+	def notifyFinished(self):
+		
+		""" Just something to do when a thread emits a finsihed signal. """
+
+		print('Worker is finished. Here is the spill data.')
+		print('The guiqueue is empty')
+		print(self.guiQueueOut.empty())
+		while not self.guiQueueOut.empty():
+			try:
+				guiQueueItem = self.guiQueueOut.get()
+				if guiQueueItem[0] == 'spill':
+					print('Found the spill')
+					print('Parsing...')
+					self.spill = guiQueueItem[1]
+					self.spill.parseCBLTs()
+					#print(self.spill[0].boards)
+					#for cblt in self.spill.cblts:
+			 		#	bitmasks.printWordBlocks(cblt.words)
+					if self.saveData == True:
+						print('Dumping binary...', end='')
+						self.spill.dumpBinary(self.directory, self.path)
+						print('Saving Spill...', end='')
+						self.spill.constructTable(self.path)
+						self.updatePath()
+						print('Done')
+				else:
+					print('Something weird when gui thread looks in gui queue!')
+					print(guiQueueItem)
+			except queue.Empty:
+				pass
+			
+		print('There were %d cblts.' % len(self.spill.cblts))
+		self.flipButtonStates(self.capture_type)
 		
 		
 		

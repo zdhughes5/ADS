@@ -22,12 +22,16 @@ import os
 import bitmasks
 import struct
 import settings as g
+import queue
 
 class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate.Mixin, Capture.Mixin):
 	
 	'''This is the main application window.'''
 	
 	def __init__(self):
+		
+
+
 		#Execute the QMainWindow __init__. 
 		#QMainWindow is a QWidget; a widget without a parent is a window.
 		super().__init__()
@@ -48,8 +52,8 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 		#Event Caputre Tab
 		self.ServerSet.setText('10.0.7.21:3491') #'10.0.7.11:3491' -> '10.0.7.21:3491'
 		self.constraint = 1
-		self.capture_type = g.CONTINUOUS_CBLT
-		self.fileNum = 0
+		self.capture_type = self.checkInitialCaptureType()
+		self.spillNum = None
 		
 		self.DirectorySet.setText('./data')
 		self.directory = None
@@ -60,6 +64,10 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 		#self.verbose = True
 		self.verbose = self.VerboseCB.isChecked()
 		self.reread = self.RereadCB.isChecked()
+		self.livePlot = self.LivePlotCB.isChecked()
+		self.plot_selection = self.PlotReadRadio.isChecked()
+		self.guiQueueIn = queue.Queue()
+		self.guiQueueOut = queue.Queue()
 		
 		self.channelsSelected = 0
 		self.channels = [
@@ -150,6 +158,7 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 		
 		self.DirectoryButton.clicked.connect(self.setCaptureDirectory)
 		self.FilenameButton.clicked.connect(self.setCaptureFilename)
+		self.SpillButton.clicked.connect(self.setCaptureSpillNum)
 		self.SaveDataCB.stateChanged.connect(self.toggleSaveData)
 		self.VerboseCB.stateChanged.connect(self.toggleVerbose)
 		
@@ -192,6 +201,10 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 		
 		self.RereadCB.stateChanged.connect(self.toggleReread)
 		
+		self.LivePlotCB.stateChanged.connect(self.toggleLivePlot)
+		self.PlotReadRadio.toggled.connect(self.setPlotSelection)
+		self.PlotRereadRadio.toggled.connect(self.setPlotSelection)
+		
 		#Simulation tab.
 		self.CsIPDFButton.clicked.connect(self.loadCsIPDF)
 		self.ChannelPDFButton.clicked.connect(self.loadChannelPDF)	
@@ -205,25 +218,32 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 	def setCaptureDirectory(self):
 		 self.directory = str(self.DirectorySet.text())
 		 self.DirectoryRO.setText(self.directory)
-		 if self.directory is not None and self.filename is not None:
-			 self.fileNum = 0
-			 self.FileNumRO.setText(str(self.fileNum))
-			 self.path = os.path.abspath(self.directory+'/'+self.filename+'_'+str(self.fileNum))
+		 if self.directory is not None and self.filename is not None and self.spillNum is not None:
+			 self.path = os.path.abspath(self.directory+'/'+self.filename+'_'+str(self.spillNum).zfill(6)+'.fits')
 			 self.PathRO.setText(self.path)
 
 	def setCaptureFilename(self):
 		self.filename = str(self.FilenameSet.text())
 		self.FilenameRO.setText(self.filename)
-		if self.directory is not None and self.filename is not None:
- 			self.fileNum = 0
- 			self.FileNumRO.setText(str(self.fileNum))
- 			self.path = os.path.abspath(self.directory+'/'+self.filename+'_'+str(self.fileNum))
+		if self.directory is not None and self.filename is not None and self.spillNum is not None:
+ 			self.path = os.path.abspath(self.directory+'/'+self.filename+'_'+str(self.spillNum).zfill(6)+'.fits')
  			self.PathRO.setText(self.path)
 			 
+	def setCaptureSpillNum(self):
+		self.spillNum = int(self.SpillSet.text())
+		self.SpillRO.setText(str(self.spillNum).zfill(6))
+		if self.directory is not None and self.filename is not None and self.spillNum is not None:
+ 			self.path = os.path.abspath(self.directory+'/'+self.filename+'_'+str(self.spillNum).zfill(6)+'.fits')
+ 			self.PathRO.setText(self.path)	 
+			 
 	def updatePath(self):
-		self.FileNumRO.setText(str(self.fileNum))
-		self.path = os.path.abspath(self.directory+'/'+self.filename+'_'+str(self.fileNum))
+		self.spillNum += 1
+		self.SpillRO.setText(str(self.spillNum).zfill(6))
+		self.path = os.path.abspath(self.directory+'/'+self.filename+'_'+str(self.spillNum).zfill(6)+'.fits')
 		self.PathRO.setText(self.path)
+		
+	def toggleLivePlot(self):
+		self.livePlot = not self.livePlot
  			
 	def toggleSaveData(self):
 		self.saveData = not self.saveData
@@ -241,7 +261,10 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 		else:
 			self.channelsSelected = self.oldChannelState 
 
-		print(format(self.channelsSelected, '#034b'))		
+		print(format(self.channelsSelected, '#034b'))
+			   
+	def setPlotSelection(self):
+		self.plot_selection = self.PlotReadRadio.isChecked()
 		
 	def getChannels(self):
 		
@@ -277,7 +300,19 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 				self.boardsSelected += 1 << i
 		
 		print(format(self.boardsSelected, '#034b'))
-
+   
+	def checkInitialCaptureType(self):
+		   if self.DurationRadio.isChecked():
+			   return g.TIMED_CBLT
+		   elif self.EventRadio.isChecked():
+			   return g.EVENT_CBLT
+		   elif self.TimeoutRadio.isChecked():
+			   return g.AUTOMATED_CBLT
+		   elif self.ContinuousRadio.isChecked():
+			   return g.CONTINUOUS_CBLT
+		   else:
+			   print('Something went wrong with initial capture determination!')
+			   return -1
 		
 
 app = QtWidgets.QApplication(sys.argv)

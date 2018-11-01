@@ -18,6 +18,11 @@ import numpy as np
 from herc.io_functions import colors
 import matplotlib.pyplot as plt
 from astropy.io import fits
+import multiprocessing as mp
+import queue
+from time import sleep
+from traceGUI import Ui_MainWindow
+import pickle
 
 ########## CAPTURE TAB ##########
 
@@ -35,11 +40,25 @@ class Mixin:
 		self.ServerRO.setText(self.currentHost)
 		
 		self.ADS_socket = ADS_socket.ADS_socket(self.currentHost)
+		
+		self.enableOnConnect()
 
+
+	
+	@pyqtSlot()
+	def enableOnConnect(self):
+		
 		self.ConnectServerButton.setEnabled(False)
 		self.RereadCB.setEnabled(True)
 		self.VerboseCB.setEnabled(True)
-
+		self.LivePlotCB.setEnabled(True)
+		self.PlotReadRadio.setEnabled(True)
+		self.PlotRereadRadio.setEnabled(True)
+		self.StartButton.setEnabled(True)
+		self.SingleEventButton.setEnabled(True)
+		self.ClearEventButton.setEnabled(True)
+		self.CloseServerButton.setEnabled(True)
+			
 		
 	@pyqtSlot()
 	def singleEventAction(self):
@@ -224,17 +243,23 @@ class Mixin:
 		""" Flips the button states when starting and stopping the event capture.
 			Should only be called from the main thread. """
 		
+		self.RereadCB.setEnabled(not self.RereadCB.isEnabled())
+		self.VerboseCB.setEnabled(not self.VerboseCB.isEnabled())
+		self.DurationRadio.setEnabled(not self.DurationRadio.isEnabled())
+		self.EventRadio.setEnabled(not self.EventRadio.isEnabled())
+		self.TimeoutRadio.setEnabled(not self.TimeoutRadio.isEnabled())
+		self.ContinuousRadio.setEnabled(not self.ContinuousRadio.isEnabled())
+		self.LivePlotCB.setEnabled(not self.LivePlotCB.isEnabled())
+		self.PlotReadRadio.setEnabled(not self.PlotReadRadio.isEnabled())
+		self.PlotRereadRadio.setEnabled(not self.PlotRereadRadio.isEnabled())
 		self.StartButton.setEnabled(not self.StartButton.isEnabled())
 		self.StopButton.setEnabled(not self.StartButton.isEnabled())
 		self.SingleEventButton.setEnabled(not self.SingleEventButton.isEnabled())
 		self.ClearEventButton.setEnabled(not self.ClearEventButton.isEnabled())
 		self.CloseServerButton.setEnabled(not self.CloseServerButton.isEnabled())
-		self.DurationRadio.setEnabled(not self.DurationRadio.isEnabled())
-		self.EventRadio.setEnabled(not self.EventRadio.isEnabled())
-		self.TimeoutRadio.setEnabled(not self.TimeoutRadio.isEnabled())
-		self.ContinuousRadio.setEnabled(not self.ContinuousRadio.isEnabled())
 		self.DirectoryButton.setEnabled(not self.DirectoryButton.isEnabled())
 		self.FilenameButton.setEnabled(not self.FilenameButton.isEnabled())
+		self.SpillButton.setEnabled(not self.SpillButton.isEnabled())
 		self.SaveDataCB.setEnabled(not self.SaveDataCB.isEnabled())
 		if capture_type == g.TIMED_CBLT:
 			self.DurationButton.setEnabled(not self.DurationButton.isEnabled())
@@ -242,25 +267,49 @@ class Mixin:
 			self.EventButton.setEnabled(not self.EventButton.isEnabled())
 		elif capture_type == g.AUTOMATED_CBLT:
 			self.TimeoutButton.setEnabled(not self.TimeoutButton.isEnabled())
-
-	@pyqtSlot()			
+		
+	@pyqtSlot()
 	def startAcquire(self):
 		
 		if self.constraint == None:
 			print("Constraint is NoneType. Did you forget to press 'Set'?")
 			return
-		
+	
 		self.spill = SpillHolder()
-		self.stop_event = threading.Event()
+		self.stop_event = mp.Event()
 		self.workerThread = QThread()
-		self.worker = captureWorker(self.ADS_socket, self.spill, self.stop_event, self.capture_type, self.constraint, self.verbose, self.reread)
+		self.worker = captureWorker(self.ADS_socket, self.spill, self.stop_event, self.guiQueueIn, self.guiQueueOut, self.livePlot, self.plot_selection, self.capture_type, self.constraint, self.verbose, self.reread)
 		self.worker.flipStateSignal.connect(self.flipButtonStates)
+		self.worker.updateGUISignal.connect(self.updateLivePlot)
 		self.workerThread.finished.connect(self.notifyFinished)
 		self.worker.moveToThread(self.workerThread)
-		self.workerThread.started.connect(self.worker.universalCapture)
+		self.workerThread.started.connect(self.worker.beginCapture)
 		self.workerThread.start()
-		self.workerThread.quit() #Be careful with this, will it prematurely end the thread? Without it
-		#we get 'QThread: Destroyed while thread is still running'. Memory Leak?
+		if self.livePlot == True:
+			self.guiQueueIn.put(('plotReady', True))
+		self.workerThread.quit()
+		
+	@pyqtSlot()
+	def updateLivePlot(self):
+		
+		try:
+			guiQueueItem = self.guiQueueOut.get(False)
+			if guiQueueItem[0] == 'plotData':
+				self.LivePlotWidget.p0.plot(guiQueueItem[1].boards[1]['Channel 0']['ADC'])
+				self.LivePlotWidget.p1.plot(guiQueueItem[1].boards[1]['Channel 1']['ADC'])
+				#self.LivePlotWidget.clear()
+				#self.LivePlotWidget.plot(guiQueueItem[1].boards[1]['Channel 0']['ADC'])
+				#self.guiQueueIn.put(('plotReady', True))
+			elif guiQueueItem[0] == 'spill':
+				print('Got the spill on the update signal. Woah!')
+				self.spill = guiQueueItem[1]
+			else:
+				print('Got something in the gui queue in the update:')
+				print(guiQueueItem)
+			
+		except queue.Empty:
+			print('Got GUI update signal but queue is empty.')
+	
 
 	@pyqtSlot()		
 	def stopAcquire(self):
@@ -275,15 +324,27 @@ class Mixin:
 		""" Just something to do when a thread emits a finsihed signal. """
 
 		print('Worker is finished. Here is the spill data.')
-		#self.spill.parseCBLTs()
-# =============================================================================
-# 		for cblt in self.spill.cblts:
-# 			bitmasks.printWordBlocks(cblt.words)
-# =============================================================================
-		#if self.saveData == True:
-		#	self.spill.constructTable()
+		print('The guiqueue is empty')
+		print(self.guiQueueOut.empty())
+		while not self.guiQueueOut.empty():
+			try:
+				guiQueueItem = self.guiQueueOut.get()
+				if guiQueueItem[0] == 'spill':
+					print('Found the spill')
+					self.spill = guiQueueItem[1]
+					if self.saveData == True:
+						p = mp.Process(target=spillParseProcess, args=(self.spill, self.directory, self.path))
+						p.start()	
+						self.updatePath()
+						print('Done')
+				else:
+					print('Something weird when gui thread looks in gui queue!')
+					print(guiQueueItem)
+			except queue.Empty:
+				pass
+			
 		print('There were %d cblts.' % len(self.spill.cblts))
-		
+		self.flipButtonStates(self.capture_type)
 
 	@pyqtSlot()		
 	def selectDurationCapture(self):
@@ -398,159 +459,6 @@ class HaltCapture(Exception):
 	pass
 
 
-class captureWorker(QObject):
-	
-	""" This object does the actual non-single-event capture. It is run in a seperate QThread. """
-	
-	flipStateSignal = pyqtSignal(int)
-	
-	def __init__(self, ADS_socket, spill, stop_event, capture_type = None, constraint = None, verbose = False, reread = False, parent = None):
-		super().__init__(parent)
-		super(self.__class__, self).__init__(parent)
-		self.ADS_socket = ADS_socket
-		self.stop_event = stop_event
-		self.capture_type = capture_type
-		self.constraint = constraint
-		self.verbose = verbose
-		self.reread = reread
-		self.spill = spill
-		
-		self.statement1CS = None
-		self.statement1UR = None
-		self.statement2US = None
-		self.statement3UR = None
-		self.statement4US = None
-		self.statement5UR = None
-		self.statement6US = None
-		self.statement7UR = None
-		self.statement8US = None
-		self.statement1RR = None
-		self.statement2RS = None
-		self.statement3RR = None
-		self.statement4RS = None
-		self.statement5RR = None
-		self.statement6RS = None
-		self.statement9UR = None
-
-		
-		if self.verbose:
-			self.statement1CS = '1C-S Sent Value: %d with length %d (CBLT command request).'
-			self.statement1UR = '1U-R Received Value: %d of length %d (Server Begin Rendevous.)'
-			self.statement2US = '2U-S Sent Value: %d with length %d (Constraint Send).'
-			self.statement3UR = '3U-R Received Value: %d with length %d (CBLT Status Rendevous).'
-			self.statement4US = '4U-S Sent Value: %d with length %d (Send nwords Rendevous).'
-			self.statement5UR = '5U-R Received Value: %d of length %d (nwords)'
-			self.statement6US = '6U-S Sent Value: %d with length %d (nwords Rendevous).'
-			self.statement7UR = '7U-R Received Value: %d and length %d (CBLT bytes)'
-			self.statement8US = '8U-S Sent Value: %d with length %d (CBLT complete Rendevous).'
-			self.statement1RR = '1R-R Received Value: %d with length %d (CBLT reread Status Rendevous).'
-			self.statement2RS = '2R-S Sent Value: %d with length %d (Send reread nwords Rendevous).'
-			self.statement3RR = '3R-R Received Value: %d with length %d (reread nwords value).'
-			self.statement4RS = '4R-S Sent Value: %d with length %d (Send reread CBLT Rendevous).'
-			self.statement5RR = '5R-R Received Value: %d with length %d (reread CBLT data).'
-			self.statement6RS = '6R-S Sent Value: %d with length %d (reread CBLT complete Rendevous).'
-			self.statement9UR = '9U-R Received Value: %d of length %d (Continue Rendevous)\n'
-		
-	def checkForStopEvent(self, **kwargs):
-		
-		""" Checks whether the stop_event has been set by the user.
-			Based on the result it tells the server whether to halt or proceed. """
-		
-		if not self.stop_event.isSet():
-			self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, **kwargs)
-		else:
-			self.ADS_socket.sendCommandToServer(g.RENDEVOUS_HALT, 1, **kwargs)
-			print('Sent halt, breaking.')
-			raise HaltCapture
-
-	def universalCapture(self):
-		
-		""" Starts the event capture. Capture_type is for the server cblt capture mode. 
-			Constraint is the corresponding parameter that tells the server when to stop
-			the capture. """
-			
-		if self.capture_type == g.TIMED_CBLT or self.capture_type == g.EVENT_CBLT or self.capture_type == g.AUTOMATED_CBLT:
-			self.constraint_size = 4 #For time and event constrait mode, the constraint is sent as an int
-		elif self.capture_type == g.CONTINUOUS_CBLT:
-			self.constraint_size = 1 #For continuous, it is just a rendevous check. Thus, a char.
-		else:
-			print('Bad capture_type: '+str(self.capture_type))
-			return
-		
-		self.flipStateSignal.emit(self.capture_type)
-
-		self.ADS_socket.sendCommandToServer(self.capture_type, 1, self.statement1CS)
-		
-		server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement1UR)
-
-			
-		if server_rendevous == g.RENDEVOUS_PROCEED:
-			self.ADS_socket.sendCommandToServer(self.constraint, self.constraint_size, self.statement2US)
-		else:
-			print('Got %d for server constraint rendevous. Returning.' % server_rendevous)
-			self.flipStateSignal.emit(self.capture_type) #Turn the buttons back on on a premature ending.
-			return
-	
-		server_rendevous = g.SERVER_RENDEVOUS_DEFAULT #Could use different variable, resetting it instead.
-		
-		#Functions can not break while loops. So, to use a function (reduce code redundacy/neatness) 
-		#and have it break the while loop it instead throws an exception (which travels up the calling 
-		#chain until it is handled). The stop_event 1. triggers the exception (for mid-loop breaks) and 2. 
-		#ends the while loop normally for server initiated stops (i.e. reaching the constraint).
-		try:
-			while not self.stop_event.isSet():
-				server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement3UR)
-				if server_rendevous != g.RENDEVOUS_PROCEED:
-					print('Got bad rendevous from server. Breaking.')
-					self.flipStateSignal.emit(self.capture_type)
-					return
-				self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement4US)				
-				
-				
-				nwords = self.ADS_socket.receiveCommandFromServer(4, self.statement5UR)
-	
-				self.checkForStopEvent(statement = self.statement6US)
-				
-				raw_data = self.ADS_socket.recv_all(nwords, self.statement7UR) #raw is the bytearray, cblt the numpy array.
-				self.spill.addBinary(raw_data)
-
-				#if self.verbose:
-				#	this_capture = CBLTData(raw_data)
-				#	this_capture.wordifyBinaryData()
-				#	bitmasks.printWordBlocks(this_capture.words)
-
-				self.checkForStopEvent(statement = self.statement8US)				
-
-				if self.reread:
-					server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement1RR)
-					if server_rendevous != g.RENDEVOUS_PROCEED:
-						print('Got bad rendevous from server. Breaking.')
-						return			
-					self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement2RS)		
-					reread_nwords = self.ADS_socket.receiveCommandFromServer(4, self.statement3RR)
-					self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement4RS)	
-					raw_reread_data = self.ADS_socket.recv_all(reread_nwords, self.statement5RR) #raw is the bytearray, cblt the numpy array.
-					self.ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, self.statement6RS)	
-					if self.verbose:
-						this_capture_reread = CBLTData(raw_reread_data)
-						this_capture_reread.wordifyBinaryData()
-						bitmasks.printWordBlocks(this_capture_reread.words)
-						
-				server_rendevous = self.ADS_socket.receiveCommandFromServer(1, self.statement9UR) #This was 4, why? Changed to 1 10/5
-				
-				if server_rendevous == g.RENDEVOUS_HALT:
-					print('Server indicates halt. Stopping.')
-					self.stop_event.set()
-				elif server_rendevous != g.RENDEVOUS_PROCEED:
-					print('Got %d for server continue rendevous. Returning.' % server_rendevous)
-					self.flipStateSignal.emit(self.capture_type)
-					return #Added as after thought, test this if there is a bug.
-				server_rendevous = g.SERVER_RENDEVOUS_DEFAULT
-		except HaltCapture:
-			pass
-				
-		print('Exited while loop.')
-		self.flipStateSignal.emit(self.capture_type) #Turn the buttons back on.
 		
 		
 
@@ -614,6 +522,15 @@ class SpillHolder:
 		for cblt in self.rereads:
 			cblt.parseWords()
 			
+	def dumpBinary(self, directory, path):
+		folder = path.split('/')[-1].split('.')[0]
+		dumpDir = directory+'/'+folder+'/'
+		subprocess.call('mkdir -p '+dumpDir, shell=True)
+		for i, cblt in enumerate(self.cblts):
+			with open(dumpDir+'spill_'+str(i), 'wb') as f:
+				f.write(cblt.binary_data)
+		
+			
 	def fadcHeader(self, board_num):
 		ax1 = np.array([x[board_num]['Start Header']['0xFADC'] for x in self.cblts])
 		cx1 = fits.Column(name='B'+str(board_num)+'_0xFADC', array=ax1, format='I') #Unsigned
@@ -654,7 +571,7 @@ class SpillHolder:
 
 		return (cx1, cx2, cx3, cx4)	
 			
-	def constructTable(self):
+	def constructTable(self, path):
 		columns = []
 		
 		# CLK board
@@ -730,20 +647,266 @@ class SpillHolder:
 
 		t = fits.BinTableHDU.from_columns(columns)
 		subprocess.call('mkdir -p /nfs/optimus/home/zdhughes/Desktop/projects/ADS/data/', shell=True)
-		t.writeto('/nfs/optimus/home/zdhughes/Desktop/projects/ADS/data/test.fits', overwrite=True)
+		t.writeto(path, overwrite=True)
 		
+def spillParseProcess(spill, directory, path):
+	print('Parsing...')
+	spill.parseCBLTs()
+	print('Dumping binary...', end='')
+	spill.dumpBinary(directory, path)
+	print('Saving Spill...', end='')
+	spill.constructTable(path)
+	print('Done')		
+		
+		
+class captureWorker(QObject):
+	
+	""" This object does the actual non-single-event capture. It is run in a seperate QThread. """
+	
+	flipStateSignal = pyqtSignal(int)
+	updateGUISignal = pyqtSignal()
+	
+	def __init__(self, ADS_socket, spill, stop_event, guiQueueIn, guiQueueOut, livePlot, plot_selection, capture_type, constraint, verbose, reread, parent = None):
+		super().__init__(parent)
+		super(self.__class__, self).__init__(parent)
+		self.ADS_socket = ADS_socket
+		self.spill = spill
+		self.stop_event = stop_event
+		self.guiQueueIn = guiQueueIn
+		self.guiQueueOut = guiQueueOut
+		self.livePlot = livePlot
+		self.plot_selection = plot_selection
+		self.capture_type = capture_type
+		self.constraint = constraint
+		self.verbose = verbose
+		self.reread = reread
+		
+		
+	def beginCapture(self):
+		
+		self.intoQueue = mp.Queue()
+		self.outofQueue = mp.Queue()
+		#pool = mp.Pool()
+		self.tester = 'tester!'
+		self.lester = ' lester! '
+		#universalCapture(self.ADS_socket, self.stop_event, self.livePlot, self.plot_selection, self.capture_type, self.constraint, self.verbose, self.reread, self.intoQueue, self.outofQueue)
+		#pool_result = pool.apply_async(universalCapture, args=(self.ADS_socket, self.stop_event, self.livePlot, self.plot_selection, self.capture_type, self.constraint, self.verbose, self.reread, self.intoQueue, self.outofQueue))
+		p = mp.Process(target=universalCapture, args=(self.ADS_socket, self.stop_event, self.livePlot, self.plot_selection, self.capture_type, self.constraint, self.verbose, self.reread, self.intoQueue, self.outofQueue))
+		p.start()	
+		
+		while p.is_alive():
+			try:
+				queueItem = self.outofQueue.get(False)
+				if queueItem[0] == 'flipStateSignal':
+					self.flipStateSignal.emit(self.capture_type) #It's possible that the process ends after this line and the queus is not empty. Check at end of thread for stuff in the queue. Is the queue destroyed when the subprocess exits?
+				elif queueItem[0] == 'plotData':
+					self.guiQueueOut.put(queueItem)
+					self.updateGUISignal.emit()
+				elif queueItem[0] == 'spill':
+					self.guiQueueOut.put(queueItem)
+				else:
+					print('Have a queue item but do not know what to do with it.')
+					print(queueItem)
+			except queue.Empty:
+				pass
+
+			try:
+				guiQueueItem = self.guiQueueIn.get(False)
+				if guiQueueItem[0] == 'plotReady':
+					self.intoQueue.put(guiQueueItem)
+				else:
+					print('Have a GUI queue item but do not know what to do with it.')
+					print(guiQueueItem)
+			except queue.Empty:
+				pass
+			
+		else:
+			while not self.outofQueue.empty():
+				queueItem = self.outofQueue.get(False)
+				if queueItem[0] == 'flipStateSignal':
+					self.flipStateSignal.emit(self.capture_type)
+				elif queueItem[0] == 'plotData':
+					pass
+				elif queueItem[0] == 'spill':
+					self.guiQueueOut.put(queueItem)
+				else:
+					print('Have a queue item but do not know what to do with it.')
 		
 		
 	
+		
+def checkForStopEvent(ADS_socket, stop_event, **kwargs):
+	
+	""" Checks whether the stop_event has been set by the user.
+		Based on the result it tells the server whether to halt or proceed. """
+	
+	if not stop_event.is_set():
+		ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, **kwargs)
+	else:
+		ADS_socket.sendCommandToServer(g.RENDEVOUS_HALT, 1, **kwargs)
+		print('Sent halt, breaking.')
+		raise HaltCapture
+		
+def echo(thing, bing):
+	print(thing+bing)
+		
+def universalCapture(ADS_socket, stop_event, livePlot, plot_selection, capture_type, constraint, verbose, reread, intoQueue, outofQueue):
+	
+	""" Starts the event capture. Capture_type is for the server cblt capture mode. 
+		Constraint is the corresponding parameter that tells the server when to stop
+		the capture. """
+		
+	statement1CS = None
+	statement1UR = None
+	statement2US = None
+	statement3UR = None
+	statement4US = None
+	statement5UR = None
+	statement6US = None
+	statement7UR = None
+	statement8US = None
+	statement1RR = None
+	statement2RS = None
+	statement3RR = None
+	statement4RS = None
+	statement5RR = None
+	statement6RS = None
+	statement9UR = None
+	
+	if verbose:
+		statement1CS = '1C-S Sent Value: %d with length %d (CBLT command request).'
+		statement1UR = '1U-R Received Value: %d of length %d (Server Begin Rendevous.)'
+		statement2US = '2U-S Sent Value: %d with length %d (Constraint Send).'
+		statement3UR = '3U-R Received Value: %d with length %d (CBLT Status Rendevous).'
+		statement4US = '4U-S Sent Value: %d with length %d (Send nwords Rendevous).'
+		statement5UR = '5U-R Received Value: %d of length %d (nwords)'
+		statement6US = '6U-S Sent Value: %d with length %d (nwords Rendevous).'
+		statement7UR = '7U-R Received Value: %d and length %d (CBLT bytes)'
+		statement8US = '8U-S Sent Value: %d with length %d (CBLT complete Rendevous).'
+		statement1RR = '1R-R Received Value: %d with length %d (CBLT reread Status Rendevous).'
+		statement2RS = '2R-S Sent Value: %d with length %d (Send reread nwords Rendevous).'
+		statement3RR = '3R-R Received Value: %d with length %d (reread nwords value).'
+		statement4RS = '4R-S Sent Value: %d with length %d (Send reread CBLT Rendevous).'
+		statement5RR = '5R-R Received Value: %d with length %d (reread CBLT data).'
+		statement6RS = '6R-S Sent Value: %d with length %d (reread CBLT complete Rendevous).'
+		statement9UR = '9U-R Received Value: %d of length %d (Continue Rendevous)\n'
+		
+	spill = SpillHolder()
+		
+	if capture_type == g.TIMED_CBLT or capture_type == g.EVENT_CBLT or capture_type == g.AUTOMATED_CBLT:
+		constraint_size = 4 #For time and event constrait mode, the constraint is sent as an int
+	elif capture_type == g.CONTINUOUS_CBLT:
+		constraint_size = 1 #For continuous, it is just a rendevous check. Thus, a char.
+	else:
+		print('Bad capture_type: '+str(capture_type))
+		sleep(0.2) #We give outselves a time cushion for the queue to clear out.
+		return
+	
+	outofQueue.put(('flipStateSignal', capture_type))
+	
+	ADS_socket.sendCommandToServer(capture_type, 1, statement1CS)
+	
+	server_rendevous = ADS_socket.receiveCommandFromServer(1, statement1UR)
 
+	if server_rendevous == g.RENDEVOUS_PROCEED:
+		ADS_socket.sendCommandToServer(constraint, constraint_size, statement2US)
+	else:
+		print('Got %d for server constraint rendevous. Returning.' % server_rendevous)
+		outofQueue.put(('spill', spill))
+		#outofQueue.put(('flipStateSignal', capture_type))
+		sleep(0.2)
+		return
+
+	server_rendevous = g.SERVER_RENDEVOUS_DEFAULT #Could use different variable, resetting it instead.
+	
+	#Functions can not break while loops. So, to use a function (reduce code redundacy/neatness) 
+	#and have it break the while loop it instead throws an exception (which travels up the calling 
+	#chain until it is handled). The stop_event 1. triggers the exception (for mid-loop breaks) and 2. 
+	#ends the while loop normally for server initiated stops (i.e. reaching the constraint).
+	try:
+		while not stop_event.is_set():
+			server_rendevous = ADS_socket.receiveCommandFromServer(1, statement3UR)
+			if server_rendevous != g.RENDEVOUS_PROCEED:
+				print('Got bad rendevous from server at 3U-R. Breaking.')
+				outofQueue.put(('spill', spill))
+				#outofQueue.put(('flipStateSignal', capture_type))
+				sleep(0.2)
+				return
+			ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, statement4US)				
 			
-		
+			nwords = ADS_socket.receiveCommandFromServer(4, statement5UR)
 
-		
-		
-		
-		
-		
+			checkForStopEvent(ADS_socket, stop_event, statement = statement6US)
+			
+			raw_data = ADS_socket.recv_all(nwords, statement7UR) #raw is the bytearray
+			spill.addBinary(raw_data)
+
+			if verbose:
+				this_capture = CBLTData(raw_data)
+				this_capture.wordifyBinaryData()
+				bitmasks.printWordBlocks(this_capture.words)
+
+			checkForStopEvent(ADS_socket, stop_event, statement = statement8US)				
+
+			if reread:
+				server_rendevous = ADS_socket.receiveCommandFromServer(1, statement1RR)
+				if server_rendevous != g.RENDEVOUS_PROCEED:
+					print('Got bad rendevous from server at 1R-R. Breaking.')
+					outofQueue.put(('spill', spill))
+					sleep(0.2)
+					return			
+				ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, statement2RS)		
+				reread_nwords = ADS_socket.receiveCommandFromServer(4, statement3RR)
+				ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, statement4RS)	
+				raw_reread_data = ADS_socket.recv_all(reread_nwords, statement5RR) #raw is the bytearray, cblt the numpy array.
+				ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, statement6RS)	
+				if verbose:
+					this_capture_reread = CBLTData(raw_reread_data)
+					this_capture_reread.wordifyBinaryData()
+					bitmasks.printWordBlocks(this_capture_reread.words)
+				
+			server_rendevous = ADS_socket.receiveCommandFromServer(1, statement9UR) #This was 4, why? Changed to 1 10/5
+			
+			if server_rendevous == g.RENDEVOUS_HALT:
+				print('Server indicates halt. Stopping.')
+				stop_event.set()
+			elif server_rendevous != g.RENDEVOUS_PROCEED:
+				print('Got %d for server continue rendevous. Returning.' % server_rendevous)
+				outofQueue.put(('spill', spill))
+				#outofQueue.put(('flipStateSignal', capture_type))
+				sleep(0.2)
+				return #Added as after thought, test this if there is a bug.
+			
+			server_rendevous = g.SERVER_RENDEVOUS_DEFAULT
+			if livePlot == True:
+				try:
+					queueItem = intoQueue.get(False)
+					if queueItem[0] == 'plotReady' and queueItem[1] == True and verbose == True:
+						this_capture.parseWords()
+						outofQueue.put(('plotData', this_capture))
+					elif queueItem[0] == 'plotReady' and queueItem[1] == True and verbose == False:
+						this_capture = CBLTData(raw_data)
+						this_capture.parseWords()
+						outofQueue.put(('plotData', this_capture))
+					elif queueItem[0] == 'plotReady' and queueItem[1] == False and verbose == True:
+						this_capture_reread.parseWords()
+						outofQueue.put(('plotData', this_capture_reread))
+					elif queueItem[0] == 'plotReady' and queueItem[1] == False and verbose == False:
+						this_capture_reread = CBLTData(raw_reread_data)
+						this_capture_reread.parseWords()
+						outofQueue.put(('plotData', this_capture_reread))
+					else:
+						print('Failed to send requested plot data.')
+				except queue.Empty:
+					pass
+	except HaltCapture:
+		pass
+			
+	print('Exited while loop.')
+	#outofQueue.put(('flipStateSignal', capture_type))
+	outofQueue.put(('spill', spill))
+	sleep(0.2)
+	return
 		
 		
 		

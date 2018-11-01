@@ -31,7 +31,7 @@ fourth1ByteShift = 0
 first6bMask = eval('0b' + '1'*6 + '0'*26)
 first6bShift = 26
 
-last26bMask = eval('0b' + '0'*26 + '1'*6)
+last26bMask = eval('0b' + '0'*6 + '1'*26)
 last26bShift = 0
 
 # Hit header

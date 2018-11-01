@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 29 15:59:30 2018
+
+@author: zdhughes
+"""
+
+from herc.io import colors
+import sys
+from time import gmtime, strftime, sleep, time
+
+class condorHandler():
+	
+	"""Object used to open, write, and run a condor vanilla-universe submit file."""
+	
+	def __init__(self, filename=None, executable=None, title=None, subtitle=None, tertiary=None, c=None):
+		
+		"""Opens a write job at the filename location. Writes the initial header."""
+		
+		self.c = c if c is not None else colors()
+		colorState = self.c.getState()
+		self.filename = filename if filename is not None else sys.exit(c.red('Error: Job filename must be given.'))
+		if executable == None: sys.exit(c.red('Error: Job executable must be given.'))
+		self.condorJob = open(filename,'w')
+		self.logs = []
+	
+		if colorState: c.disableColors()
+		self.condorJob.write('######################################\n')
+		self.condorJob.write('#\n')
+		self.condorJob.write('# '+title+'\n')
+		self.condorJob.write('# '+subtitle+'\n')
+		self.condorJob.write('# '+tertiary+'\n')
+		self.condorJob.write('# Generated at UTC '+strftime("%Y-%m-%d %H:%M:%S", gmtime())+'\n')
+		self.condorJob.write('#\n')
+		self.condorJob.write('######################################\n')
+		self.condorJob.write('\n')
+		self.condorJob.write('Universe   = vanilla\n')
+		self.condorJob.write('Executable = '+executable+'\n')
+		self.condorJob.write('\n')
+		self.condorJob.flush()
+		if colorState: c.enableColors()
+
+	def addEntry(self, entries):
+		
+		"""Takes a dictionary and adds them as condor queue entries."""
+		
+		colorState = self.c.getState()
+	
+		if entries == None:
+			print(self.c.red('Warning: no entries given in condor header creator. This is probably wrong!'))
+	
+		if colorState: self.c.disableColors()	
+		if 'requirements' in entries:
+			self.condorJob.write('requirements'+' = '+entries['requirements']+'\n')
+			del entries['requirements']
+		if 'output' in entries:
+			self.condorJob.write('output'+' = '+entries['output']+'\n')
+			del entries['output']
+		if 'error' in entries:
+			self.condorJob.write('error'+' = '+entries['error']+'\n')
+			del entries['error']
+		if 'log' in entries:
+			self.condorJob.write('log'+' = '+entries['log']+'\n')
+			self.logs.append(entries['log'])
+			del entries['log']
+		if 'arguments' in entries:
+			self.condorJob.write('arguments'+' = '+entries['arguments']+'\n')
+			del entries['arguments']
+	
+		if len(entries) > 0:
+			for key in entries:
+				self.condorJob.write(key+' = '+entries[key]+'\n')
+				
+		self.condorJob.write('getenv = True\n')
+		self.condorJob.write('queue\n')
+		self.condorJob.write('\n')
+		self.condorJob.flush()
+	
+		if colorState: self.c.enableColors()
+				
+	def close(self):
+		self.condorJob.close()
+		
+	def run(self, timeout = None, prepend = '', append = ''):
+		if timeout:
+			self.starttime = time()
+		subprocess.call(prepend+'condor_submit '+self.filename+append, shell=True)
+		while len(self.logs) > 0:
+			for i, log in enumerate(self.logs):
+				if subprocess.run('grep "return" '+log, shell=True).returncode == 0:
+					del self.logs[i]
+			sleep(1)
+			if timeout:
+				if (time() - self.starttime) > timeout:
+					print(self.c.yellow('Timeout reached. Breaking.'))
+					break
