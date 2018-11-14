@@ -50,6 +50,9 @@
 #define GET_0_SUPRESS_LEVEL 59
 #define READ_ALL_PARAMS 60
 #define GET_FADC_MODE 61
+#define GET_REREAD_MODE 62
+#define GET_VERBOSITY 63
+#define GET_TIMEIN 64
 
 // Parameter set commands
 #define SET_DATA_WIDTH 150
@@ -66,6 +69,7 @@
 #define SET_FADC_MODE 161
 #define SET_REREAD_MODE 162
 #define SET_VERBOSITY 163
+#define SET_TIMEIN 164
 
 // DACQ commands.
 #define CLEAR_EVENT 200
@@ -81,9 +85,9 @@
 const unsigned char VERBOSE_ON = 1;
 const unsigned char VERBOSE_OFF = 0;
 unsigned char verbose_status = 0;
-const char *unifiedStrings[9];
+const char *unifiedStrings[12];
 const char *rereadStrings[6];
-const char *blankStrings[10];
+const char *blankStrings[12];
 
 // Status and execution rendevous values.
 // I used 1 for good/on/proceed and 0 for bad/off/halt.
@@ -199,6 +203,11 @@ int main(void) {
     unifiedStrings[6] = "7U-S Sent Value: %d and length %d (CBLT bytes).\n";
     unifiedStrings[7] = "8U-R Received Value: %d with length %d (CBLT complete Rendevous).\n";
     unifiedStrings[8] = "9U-S Sent Value: %d of length %d (Continue Rendevous)\n";
+    unifiedStrings[9] = "10U-S Sent Value: %d with length %d (OK continue Rendevous).\n";
+    unifiedStrings[10] = "11U-S Sent Value: %d with length %d (1st Short circuit).\n";
+    unifiedStrings[11] = "12U-S Sent Value: %d with length %d (2nd Short circuit).\n";
+    unifiedStrings[12] = "13U-S Sent Value: %d with length %d (3rd Short circuit).\n";
+    
 
     rereadStrings[0] = "1R-S Sent Value: %d with length %d (CBLT reread Status Rendevous).\n";
     rereadStrings[1] = "2R-R Received Value: %d with length %d (Send reread nwords Rendevous).\n";
@@ -217,6 +226,9 @@ int main(void) {
     blankStrings[7] = "";
     blankStrings[8] = "";
     blankStrings[9] = "";
+    blankStrings[10] = "";
+    blankStrings[11] = "";
+    blankStrings[12] = "";
 
 
     // To always know the machines implementation of data types.
@@ -491,9 +503,24 @@ int main(void) {
                 break;
             case GET_0_SUPRESS_LEVEL:
                 universalChannelGet(comm_socket, command_request);         
-                break; 
+                break;
             case READ_ALL_PARAMS:
+                break;
             case GET_FADC_MODE:
+                break;
+            case GET_REREAD_MODE:
+                sent_nbytes = send(comm_socket, &reread_status, 1, 0);
+                printf("1S-S Sent Value: %d with length %d (Send status Rendevous).\n", reread_status, sent_nbytes);
+                break;
+            case GET_VERBOSITY:
+                sent_nbytes = send(comm_socket, &verbose_status, 1, 0);
+                printf("1S-S Sent Value: %d with length %d (Send status Rendevous).\n", verbose_status, sent_nbytes);
+                break;
+            case GET_TIMEIN:
+                sent_nbytes = send(comm_socket, &requested_timein, 4, 0);
+                printf("1S-S Sent Value: %d with length %d (Send status Rendevous).\n", requested_timein, sent_nbytes);
+                break;                              
+
         // Parameter set commands
             case SET_DATA_WIDTH:
                 universalBoardSet(comm_socket, command_request);
@@ -547,6 +574,15 @@ int main(void) {
 
                 break;
 
+            case SET_TIMEIN:
+
+                sent_nbytes = send(comm_socket, &RENDEVOUS_PROCEED, 1, 0);
+                printf("1S-S Sent Value: %d with length %d (Send status Rendevous).\n", RENDEVOUS_PROCEED, sent_nbytes);                
+
+                recv_nbytes = recv(comm_socket, &requested_timein, 4, 0);
+                printf("2S-R Received Value: %d with length %d (Verbosity status).\n", requested_timein, recv_nbytes);                
+
+                break;
 
             default:
                 printf("Unkown command or something else wrong: %d . \n", command_request);
@@ -904,7 +940,7 @@ void unifiedCBLT(int comm_socket_, unsigned char command_request_, unsigned long
 
     recv_nbytes_ = recv(comm_socket_, &client_constraint, sizeof(unsigned int), 0);
     printf(unifiedStrings[1], client_constraint, recv_nbytes_);
-
+    printf("client_constraint: %d\n", client_constraint);
 
     if (command_request_ == TIMED_CBLT) {
         end_value = client_constraint * 1000.0;
@@ -913,7 +949,14 @@ void unifiedCBLT(int comm_socket_, unsigned char command_request_, unsigned long
     } else if (command_request_ == CONTINUOUS_CBLT) {
         end_value = 1;
     } else if (command_request_ == AUTOMATED_CBLT) {
-        end_value == client_constraint;
+        printf("pcommand_request_: %d\n", command_request_);
+        printf("pend_value: %f\n", end_value);
+        printf("pclient_constraint: %d\n", client_constraint);
+        end_value = (double) client_constraint;
+        printf("acommand_request_: %d\n", command_request_);
+        printf("aend_value: %f\n", end_value);
+        printf("aend_value: %d\n", end_value);
+        printf("aclient_constraint: %d\n", client_constraint);
     } else {
         sent_nbytes_ = send(comm_socket_, &RENDEVOUS_HALT, 1, 0);
         printf("Got bad command request. You should never see this happen. Returning.\n");
@@ -922,7 +965,6 @@ void unifiedCBLT(int comm_socket_, unsigned char command_request_, unsigned long
 
     current_value = 0;
     remaining_value = end_value;
-
 
     rv = timein_event(requested_timein);
     if (rv != 1) {
@@ -936,7 +978,7 @@ void unifiedCBLT(int comm_socket_, unsigned char command_request_, unsigned long
     clear_clk_scalars();
 
     while( current_value <= end_value) {
-        //printf("%f ", current_value);
+        //printf("end_value loop: %f\n", end_value);
         if (fadc_got_event()) {
             returned_nwords_ = fadc_cblt();
 
@@ -1005,7 +1047,15 @@ void unifiedCBLT(int comm_socket_, unsigned char command_request_, unsigned long
             } else if (command_request_ == EVENT_CBLT) {
                 current_value = n;
                 remaining_value = end_value - current_value;
-                printf("%d events done. There are %d events left.\n", (int) current_value, (int) remaining_value);            
+                printf("%d events done. There are %d events left.\n", (int) current_value, (int) remaining_value); 
+                if (current_value == end_value) {
+                    sent_nbytes_ = send(comm_socket_, &RENDEVOUS_HALT, 1, 0);
+                    printf(unifiedStrings[10], RENDEVOUS_HALT, sent_nbytes_);
+
+                    recv_nbytes_ = recv(comm_socket_, &client_rendevous, 1, 0);
+                    printf(unifiedStrings[11], client_rendevous, recv_nbytes_);                    
+                    break;
+                }          
             } else if (command_request_ == CONTINUOUS_CBLT) {
                 ;
             } else if (command_request_ == AUTOMATED_CBLT) {
@@ -1030,6 +1080,15 @@ void unifiedCBLT(int comm_socket_, unsigned char command_request_, unsigned long
                 printf(unifiedStrings[8], RENDEVOUS_HALT, sent_nbytes_);                        
             }
 
+            recv_nbytes_ = recv(comm_socket_, &client_rendevous, 1, 0);
+            printf(unifiedStrings[9], client_rendevous, recv_nbytes_);
+            if (client_rendevous != RENDEVOUS_PROCEED) {
+                printf("Got bad Rendevous. Returning.\n");
+                break;
+            }
+            client_rendevous = 255;
+
+
 
         } else {
 
@@ -1043,8 +1102,8 @@ void unifiedCBLT(int comm_socket_, unsigned char command_request_, unsigned long
                     printf("Whoa there\n");
                     current_value = DBL_MAX;
                     sent_nbytes_ = send(comm_socket_, &RENDEVOUS_HALT, 1, 0);
-                    printf(unifiedStrings[2], RENDEVOUS_HALT, sent_nbytes_);
-                    printf("(Short-circuited)\n")
+                    printf(unifiedStrings[10], RENDEVOUS_HALT, sent_nbytes_);
+                    printf("(Short-circuited)\n"); // sends 3U-S's message.
                     break;
                 }
             } else if (command_request_ == EVENT_CBLT) {
@@ -1063,8 +1122,10 @@ void unifiedCBLT(int comm_socket_, unsigned char command_request_, unsigned long
                     }
                 }
                 if ( current_value >= end_value ) {
+                    printf("End value: %f\n", end_value);
+                    printf("Current value: %f\n", current_value);
                     sent_nbytes_ = send(comm_socket_, &RENDEVOUS_HALT, 1, 0);
-                    printf(unifiedStrings[8], RENDEVOUS_HALT, sent_nbytes_);
+                    printf(unifiedStrings[11], RENDEVOUS_HALT, sent_nbytes_);
                 }
             }
         }

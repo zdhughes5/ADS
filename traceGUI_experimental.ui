@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1000</width>
+    <width>1102</width>
     <height>1029</height>
    </rect>
   </property>
@@ -38,7 +38,7 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>461</width>
+             <width>512</width>
              <height>1888</height>
             </rect>
            </property>
@@ -1292,6 +1292,12 @@
        </layout>
       </widget>
       <widget class="QWidget" name="eventTab">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <attribute name="title">
         <string>Event Capture</string>
        </attribute>
@@ -1299,10 +1305,16 @@
         <item>
          <widget class="QScrollArea" name="EventLeftSide">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-            <horstretch>0</horstretch>
+           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+            <horstretch>2</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>0</height>
+           </size>
           </property>
           <property name="widgetResizable">
            <bool>true</bool>
@@ -1312,13 +1324,20 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>389</width>
-             <height>732</height>
+             <width>477</width>
+             <height>4518</height>
             </rect>
            </property>
            <layout class="QGridLayout" name="gridLayout_2">
             <item row="0" column="1">
-             <widget class="PlotWidget" name="LivePlotWidget"/>
+             <widget class="pgCanvas" name="LivePlotWidget">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>4500</height>
+               </size>
+              </property>
+             </widget>
             </item>
            </layout>
           </widget>
@@ -3151,7 +3170,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1000</width>
+     <width>1102</width>
      <height>22</height>
     </rect>
    </property>
@@ -3193,9 +3212,9 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>PlotWidget</class>
+   <class>pgCanvas</class>
    <extends>QGraphicsView</extends>
-   <header>pyqtgraph</header>
+   <header>mplwidget</header>
   </customwidget>
  </customwidgets>
  <resources/>

@@ -1026,13 +1026,76 @@ class captureWorker(QObject):
 		
 		
 		
+def electronBethe(E, I, n, A, z):
+	
+	B = getBeta(E, z)
+	
+	prefix = ((-4 * np.pi * k0_ev**2 * e_ev**4) / (m_e_ev * B**2)) * n * A
+	print('electron prefix: '+str(prefix))
+	suffix1 = m.log( (m_e_ev * B**2 * E) / (2*I**2*(1 - B**2)) )
+	suffix2 = -1*m.log(2)*( 2*m.sqrt(1 - B**2) - 1 + B**2 )
+	suffix3 = 1-B**2
+	suffix4 = (1/8) * (1 - m.sqrt(1 - B**2))**2
+	
+	suffix = suffix1 + suffix2 + suffix3 + suffix4
+	print('electron suffix: '+str(suffix))
+
+	
+	
+	dE_dX = prefix*suffix
+	
+	return dE_dX		
 		
 		
 		
+
 		
 		
 		
+#print((4 * np.pi * k**2 * e_charge**4)/(m_electron))
+print( (4* np.pi * k0_mks**2 * e_mks**4) / (m_e_mks * c_mks**2) )
+
+print('++++++++++')
+#print('dE_dX electron: '+str(stoppingPower_e))
+print('')
+print('dE_dX ion: '+str(stoppingPower_ion))
+print('')
+#print('ratio (ion/e): '+str(stoppingPower_ion/stoppingPower_e))
+print('++++++++++')
 		
 		
-		
-		
+print(stoppingPower_ion)
+stoppingPower_ion = ionBethe(T_ion, 74.6, 3.34*10**29, 1)
+print(stoppingPower_ion)
+
+
+#stoppingPower_e = electronBethe(T_electron, I_CsI, n_CsI, A_CsI, 0)
+#stoppingPower_ion = ionBethe(T_ion, I_CsI, n_CsI, A_CsI, 1)
+
+
+	print('ion prefixConstant: '+str(prefixConstant))
+	print('ion prefixVariable: '+str(prefixVariable))
+	print('ion prefix: '+str(prefix))
+	
+	print('ion suffixConstant: '+str(suffixConstant))	
+	print('ion f_B: '+str(f_B))
+	print('ion logI: '+str(logI))
+	print('ion dE_dX: '+str(dE_dX))
+
+
+	print('electron dE_dX: '+str(dE_dX))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -50,16 +50,17 @@ class Window(QtWidgets.QMainWindow, Ui_MainWindow, traceAnalysis.Mixin, Simulate
 		self.place = -1
 		
 		#Event Caputre Tab
-		self.ServerSet.setText('10.0.7.21:3491') #'10.0.7.11:3491' -> '10.0.7.21:3491'
+		self.ServerSet.setText('10.0.7.20:3491') #'10.0.7.11:3491' -> '10.0.7.21:3491'
 		self.constraint = 1
 		self.capture_type = self.checkInitialCaptureType()
 		self.spillNum = None
 		
-		self.DirectorySet.setText('./data')
+		self.DirectorySet.setText('/nfs/data_disks/herc0b/users/zdhughes')
 		self.directory = None
-		self.FilenameSet.setText('run')
+		self.FilenameSet.setText('spill')
 		self.filename = None
 		self.spill = None
+		self.SpillSet.setText('1')
 		self.saveData = self.SaveDataCB.isChecked()
 		#self.verbose = True
 		self.verbose = self.VerboseCB.isChecked()

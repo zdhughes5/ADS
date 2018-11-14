@@ -4,6 +4,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import matplotlib.artist as art
 import pyqtgraph as pg
+import numpy as np
 
 class SimplePlotCavas(FigureCanvas):
 	def __init__(self):
@@ -118,20 +119,36 @@ class FADCWidget(QtWidgets.QWidget):
 class pgCanvas(pg.GraphicsLayoutWidget):
 	def __init__(self, parent = None):
 		pg.GraphicsLayoutWidget.__init__(self)
+
+		self.plotChannel = []
+		self.dataChannel = []
+		self.finallyMaybe = []
+		data = np.random.normal(size=(100))
+
+		for i in range(30):
+			self.plotChannel.append(self.addPlot(row=i, col=1))
+			self.plotChannel[i].showGrid(x = True, y = True, alpha = 0.3)
+			if i > 0:
+				self.plotChannel[i].setXLink(self.plotChannel[0])
+			if i < 29:
+				self.plotChannel[i].getAxis('bottom').setStyle(showValues=False)
+				self.plotChannel[i].getAxis('bottom').showLabel(False)
+			self.plotChannel[i].setYRange(-1, 100)
+			self.plotChannel[i].setLabel('left', text='Channel '+str(i)+' [ADC]')
+			self.plotChannel[i].setMouseEnabled(x=False, y=False)
+			self.dataChannel.append(self.plotChannel[-1].plot(data))
+			#print(self.plotChannel[-1])
+			#print(self.dataChannel[-1])
+			
+	def clearAll(self):
+		for i in self.plotChannel:
+			i.clear()
+
 		
-		self.p0 = self.addPlot(row=1, col=1)
-		self.p1 = self.addPlot(row=2, col=1)
-		
-		self.p0.showGrid(x = True, y = True, alpha = 0.3)
-		self.p1.showGrid(x = True, y = True, alpha = 0.3)
-		
-		self.p1.setXLink(self.p0)
-		
-		
-class pgWidget(QtWidgets.QGraphicsView):
-	def __init__(self, parent = None):
-		QtWidgets.QGraphicsView.__init__(self, parent)
-		self.canvas = pgCanvas()
+#class pgWidget(QtWidgets.QGraphicsView):
+#	def __init__(self, parent = None):
+#		QtWidgets.QGraphicsView.__init__(self, parent)
+#		self.canvas = pgCanvas()
 		
 		
 		

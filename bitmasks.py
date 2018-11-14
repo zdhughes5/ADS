@@ -9,6 +9,7 @@ Created on Wed Sep 19 14:30:10 2018
 import struct
 import numpy as np
 from herc.io_functions import colors
+from statistics import mode
 
 # Using 32-bit words
 # I don't like counting 1's and 0's and I can't to dec->bin conversions
@@ -155,12 +156,13 @@ def extractWordsPerChannel(words):
 	else:
 		print('Warning got different number of words for each board:')
 		print(numbers)
-		print('Dumping words:')
+		print('Dumping words and returning mode of word numbers:')
 		for i, word in enumerate(words):
 			hexed = '0x%08x' % word
 			print(hexed, end=' ')
 			if (i+1) % 8 == 0:
 				print('')	
+		return mode(numbers)
 		
 def extractADC(word):
 	
@@ -347,7 +349,7 @@ def parseFADCsNew(words, wordsPerChannel = None):
 		wordsPerChannel = extractWordsPerChannel(words) # Channel data words.
 		wordsPerChannel += 1 #For the area header word.
 		
-	clkLocations, fadcLocations, otherLocations, dataLocations, areaLocations, lastBoardLocation, duplicates = getWordIndicies(words, wordsPerChannel = wordsPerChannel)
+	#clkLocations, fadcLocations, otherLocations, dataLocations, areaLocations, lastBoardLocation, duplicates = getWordIndicies(words, wordsPerChannel = wordsPerChannel)
 		
 	startHeader = {
 		'0xCAFE': maskAndRShifter(words[0], first2ByteMask, first2ByteShift),
@@ -391,7 +393,7 @@ def parseFADCsNew(words, wordsPerChannel = None):
 
 	for i, word in enumerate(words):
 		hexed = '0x%08x' % word
-		if hexed[0:6].lower() == '0xfadc':
+		if hexed[0:6].lower() == '0xfadc' and i > 7:
 			startHeader = {
 					'0xFADC' : maskAndRShifter(words[i], first2ByteMask, first2ByteShift),
 					'Board Number' : maskAndRShifter(words[i], third1ByteMask, third1ByteShift),
@@ -431,12 +433,12 @@ def parseFADCsNew(words, wordsPerChannel = None):
 			
 			boards.append(board)
 			
-	lastBoardStatus = {
-			'Sync Pattern' : maskAndRShifter(words[lastBoardLocation[0]], first15bMask, first15bShift),
-			'CBLT Buf Size' : maskAndRShifter(words[lastBoardLocation[0]], last17bMask, last17bShift)
-			}
+	#lastBoardStatus = {
+	#		'Sync Pattern' : maskAndRShifter(words[lastBoardLocation[0]], first15bMask, first15bShift),
+	#		'CBLT Buf Size' : maskAndRShifter(words[lastBoardLocation[0]], last17bMask, last17bShift)
+	#		}
 	
-	boards.append(lastBoardStatus)
+	#boards.append(lastBoardStatus)
 
 			
 	return boards	

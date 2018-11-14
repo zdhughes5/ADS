@@ -58,6 +58,7 @@ class Mixin:
 		self.SingleEventButton.setEnabled(True)
 		self.ClearEventButton.setEnabled(True)
 		self.CloseServerButton.setEnabled(True)
+		self.TimeInButton.setEnabled(True)
 			
 		
 	@pyqtSlot()
@@ -296,11 +297,43 @@ class Mixin:
 		try:
 			guiQueueItem = self.guiQueueOut.get(False)
 			if guiQueueItem[0] == 'plotData':
-				self.LivePlotWidget.p0.plot(guiQueueItem[1].boards[1]['Channel 0']['ADC'])
-				self.LivePlotWidget.p1.plot(guiQueueItem[1].boards[1]['Channel 1']['ADC'])
-				#self.LivePlotWidget.clear()
+				#self.LivePlotWidget.clearAll() #This deletes the plotItem object, I think. Don't need it to update plot.
+				for i, board in enumerate(guiQueueItem[1].boards[1:]):
+					#self.LivePlotWidget.isThisRight[10*i+0].setData(data)
+					print(board)
+					print('+++++++++++++++++++++++++++++++++++++++')
+					self.LivePlotWidget.dataChannel[10*i+0].setData(board['Channel 0']['ADC'])
+					self.LivePlotWidget.dataChannel[10*i+1].setData(board['Channel 1']['ADC'])
+					self.LivePlotWidget.dataChannel[10*i+2].setData(board['Channel 2']['ADC'])
+					self.LivePlotWidget.dataChannel[10*i+3].setData(board['Channel 3']['ADC'])
+					self.LivePlotWidget.dataChannel[10*i+4].setData(board['Channel 4']['ADC'])
+					self.LivePlotWidget.dataChannel[10*i+5].setData(board['Channel 5']['ADC'])
+					self.LivePlotWidget.dataChannel[10*i+6].setData(board['Channel 6']['ADC'])
+					self.LivePlotWidget.dataChannel[10*i+7].setData(board['Channel 7']['ADC'])
+					self.LivePlotWidget.dataChannel[10*i+8].setData(board['Channel 8']['ADC'])
+					try:
+						self.LivePlotWidget.dataChannel[10*i+9].setData(board['Channel 9']['ADC'])
+					except:
+						print(bitmasks.printWordBlocks(guiQueueItem[1].words))
+						print(guiQueueItem[1])
+						print(guiQueueItem[1].binary_data)
+# =============================================================================
+# 					self.LivePlotWidget.plotChannel[10*i+0].plot(board['Channel 0']['ADC'])
+# 					self.LivePlotWidget.plotChannel[10*i+1].plot(board['Channel 1']['ADC'])
+# 					self.LivePlotWidget.plotChannel[10*i+2].plot(board['Channel 2']['ADC'])
+# 					self.LivePlotWidget.plotChannel[10*i+3].plot(board['Channel 3']['ADC'])
+# 					self.LivePlotWidget.plotChannel[10*i+4].plot(board['Channel 4']['ADC'])
+# 					self.LivePlotWidget.plotChannel[10*i+5].plot(board['Channel 5']['ADC'])
+# 					self.LivePlotWidget.plotChannel[10*i+6].plot(board['Channel 6']['ADC'])
+# 					self.LivePlotWidget.plotChannel[10*i+7].plot(board['Channel 7']['ADC'])
+# 					self.LivePlotWidget.plotChannel[10*i+8].plot(board['Channel 8']['ADC'])
+# 					self.LivePlotWidget.plotChannel[10*i+9].plot(board['Channel 9']['ADC'])
+# =============================================================================
+					
+				#self.LivePlotWidget.p0.plot(guiQueueItem[1].boards[1]['Channel 0']['ADC'])
+				#self.LivePlotWidget.p1.plot(guiQueueItem[1].boards[1]['Channel 1']['ADC'])
 				#self.LivePlotWidget.plot(guiQueueItem[1].boards[1]['Channel 0']['ADC'])
-				#self.guiQueueIn.put(('plotReady', True))
+				self.guiQueueIn.put(('plotReady', True))
 			elif guiQueueItem[0] == 'spill':
 				print('Got the spill on the update signal. Woah!')
 				self.spill = guiQueueItem[1]
@@ -326,8 +359,8 @@ class Mixin:
 		""" Just something to do when a thread emits a finsihed signal. """
 
 		print('Worker is finished. Here is the spill data.')
-		print('The guiqueue is empty')
-		print(self.guiQueueOut.empty())
+		#print('The guiqueue is empty:')
+		#print(self.guiQueueOut.empty())
 		while not self.guiQueueOut.empty():
 			try:
 				guiQueueItem = self.guiQueueOut.get()
@@ -335,10 +368,19 @@ class Mixin:
 					print('Found the spill')
 					self.spill = guiQueueItem[1]
 					if self.saveData == True:
-						p = mp.Process(target=spillParseProcess, args=(self.spill, self.directory, self.path))
-						p.start()	
-						self.updatePath()
-						print('Done')
+						if len(self.spill.cblts) > 0:
+							print('CBLT Number: '+str(len(self.spill.cblts)))
+							print('Rereads Number: '+str(len(self.spill.rereads)))
+							print('Saving Data...')
+							p = mp.Process(target=spillDumpProcess, args=(self.spill, self.directory, self.path))
+							p.start()	
+							pf = mp.Process(target=spillParseProcess, args=(self.spill, self.directory, self.path))
+							pf.start()
+							self.updatePath()
+							print('Done')
+						else:
+							print('There seems to be no CBLTs in the spill. Updating path to next spill.')
+							self.updatePath()
 				else:
 					print('Something weird when gui thread looks in gui queue!')
 					print(guiQueueItem)
@@ -348,11 +390,11 @@ class Mixin:
 		print('There were %d cblts.' % len(self.spill.cblts))
 		self.flipButtonStates(self.capture_type)
 		
-		print(self.cont_event.is_set())
-		print(self.capture_type)
-		print(g.EVENT_CBLT )
+		#print(self.cont_event.is_set())
+		#print(self.capture_type)
+		#print(g.EVENT_CBLT )
 		
-		if self.capture_type == g.EVENT_CBLT and self.cont_event.is_set() == False:
+		if self.capture_type == g.AUTOMATED_CBLT and self.cont_event.is_set() == False:
 			print('Rerunning')
 			self.startAcquire()
 
@@ -468,11 +510,6 @@ class HaltCapture(Exception):
 	
 	pass
 
-
-		
-		
-
-
 class CBLTData:
 	
 	def __init__(self, binary_data, endianness = '<', wordSize = 4):
@@ -504,7 +541,7 @@ class SpillHolder:
 	def __init__(self):
 		self.cblts = []
 		self.rereads = []
-		
+		self.boardNum = None
 		
 	def __getitem__(self, key):
 		return self.cblts[key]
@@ -533,140 +570,176 @@ class SpillHolder:
 		for cblt in self.rereads:
 			cblt.parseWords()
 			
+		self.boardNum = len(self.cblts[0].boards)
+			
 	def dumpBinary(self, directory, path):
 		folder = path.split('/')[-1].split('.')[0]
 		dumpDir = directory+'/'+folder+'/'
 		subprocess.call('mkdir -p '+dumpDir, shell=True)
 		for i, cblt in enumerate(self.cblts):
-			with open(dumpDir+'spill_'+str(i), 'wb') as f:
+			with open(dumpDir+'read_'+str(i), 'wb') as f:
 				f.write(cblt.binary_data)
+		for i, reread in enumerate(self.rereads):
+			with open(dumpDir+'reread_'+str(i), 'wb') as f:
+				f.write(reread.binary_data)
+				
+	def clockHeader(self, data, reread = False):
 		
-			
-	def fadcHeader(self, board_num):
-		ax1 = np.array([x[board_num]['Start Header']['0xFADC'] for x in self.cblts])
-		cx1 = fits.Column(name='B'+str(board_num)+'_0xFADC', array=ax1, format='I') #Unsigned
-		ax2 = np.array([x[board_num]['Start Header']['Board Number'] for x in self.cblts])
-		cx2 = fits.Column(name='B'+str(board_num)+'_Board_Number', array=ax2, format='B')
-		ax3 = np.array([x[board_num]['Start Header']['Words Per Channel'] for x in self.cblts])
-		cx3 = fits.Column(name='B'+str(board_num)+'_Words_Per_Channel', array=ax3, format='B')
-
-		# Event Header
-		ax4 = np.array([x[board_num]['Event Header']['Event Count'] for x in self.cblts])
-		cx4 = fits.Column(name='B'+str(board_num)+'_Event_Count', array=ax4, format='J') #Unsigned
-		ax5 = np.array([x[board_num]['Event Header']['Misc. 6 bits'] for x in self.cblts])
-		cx5 = fits.Column(name='B'+str(board_num)+'_misc_bits', array=ax5, format='B')
-
-		# Hit Header
-		ax6 = np.array([x[board_num]['Hit Header']['Mode'] for x in self.cblts])
-		cx6 = fits.Column(name='B'+str(board_num)+'_Mode', array=ax6, format='B') #Unsigned
-		ax7 = np.array([x[board_num]['Hit Header']['HILO'] for x in self.cblts])
-		cx7 = fits.Column(name='B'+str(board_num)+'_HILO', array=ax7, format='I')
-		ax8 = np.array([x[board_num]['Hit Header']['Trigger Flags'] for x in self.cblts])
-		cx8 = fits.Column(name='B'+str(board_num)+'_Trigger_Flags', array=ax8, format='I')
-		ax9 = np.array([x[board_num]['Hit Header']['Channel Hits'] for x in self.cblts])
-		cx9 = fits.Column(name='B'+str(board_num)+'_Channel_Hits', array=ax9, format='I')
-	
-		return (cx1, cx2, cx3, cx4, cx5, cx6, cx7, cx8, cx9)
-	
-	def fadcPayload(self, board_num, channel):
-		
-		adcFormat = str(len(self.cblts[0][1]['Channel 1']['ADC']))+'B' #The first channel (['Channel 1']) of the first fadc board (1) of the first cblt (0)
-		ax1 = np.array([x[board_num]['Channel '+str(channel)]['ADC'] for x in self.cblts])
-		cx1 = fits.Column(name='B'+str(board_num)+'_Channel_'+str(channel)+'_ADC', array=ax1, format=adcFormat)
-		ax2 = np.array([x[board_num]['Channel '+str(channel)]['Channel Number'] for x in self.cblts])
-		cx2 = fits.Column(name='B'+str(board_num)+'_Channel_'+str(channel), array=ax2, format='B')
-		ax3 = np.array([x[board_num]['Channel '+str(channel)]['Unused'] for x in self.cblts])
-		cx3 = fits.Column(name='B'+str(board_num)+'_Channel_'+str(channel)+'_Unused', array=ax3, format='I')
-		ax4 = np.array([x[board_num]['Channel '+str(channel)]['Pulse Area'] for x in self.cblts])
-		cx4 = fits.Column(name='B'+str(board_num)+'_Channel_'+str(channel)+'_Area', array=ax4, format='I')
-
-		return (cx1, cx2, cx3, cx4)	
-			
-	def constructTable(self, path):
-		columns = []
+		prefix = ''
+		if reread == True:
+			prefix = 'RR_'
 		
 		# CLK board
 		# Start Header
-		a1 = np.array([x[0]['Start Header']['0xCAFE'] for x in self.cblts])
-		c1 = fits.Column(name='0xCAFE', array=a1, format='I') #Unsigned
-		columns.append(c1)
-		a2 = np.array([x[0]['Start Header']['Board Number'] for x in self.cblts])
-		c2 = fits.Column(name='CLK Board Number', array=a2, format='B')
-		columns.append(c2)
-		a3 = np.array([x[0]['Start Header']['Serial Number'] for x in self.cblts])
-		c3 = fits.Column(name='Serial Number', array=a3, format='B')
-		columns.append(c3)
+		a1 = np.array([x[0]['Start Header']['0xCAFE'] for x in data])
+		c1 = fits.Column(name=prefix+'0xCAFE', array=a1, format='I') #Unsigned
+
+		a2 = np.array([x[0]['Start Header']['Board Number'] for x in data])
+		c2 = fits.Column(name=prefix+'CLK_Board_Number', array=a2, format='B')
+
+		a3 = np.array([x[0]['Start Header']['Serial Number'] for x in data])
+		c3 = fits.Column(name=prefix+'Serial_Number', array=a3, format='B')
 		
 		# Event Header
-		a4 = np.array([x[0]['Event Header']['EVT'] for x in self.cblts])
-		c4 = fits.Column(name='CLK Event', array=a4, format='J')
-		columns.append(c4)
+		a4 = np.array([x[0]['Event Header']['EVT'] for x in data])
+		c4 = fits.Column(name=prefix+'CLK_Event', array=a4, format='J')
 
 		# Trigger Header		
-		a5 = np.array([x[0]['Trig Header']['Trig EVT'] for x in self.cblts])
-		c5 = fits.Column(name='CLK Trigger Event', array=a5, format='I')
-		columns.append(c5)
-		a6 = np.array([x[0]['Trig Header']['Trig Code'] for x in self.cblts])
-		c6 = fits.Column(name='CLK Trigger Code', array=a6, format='I')	
-		columns.append(c6)
+		a5 = np.array([x[0]['Trig Header']['Trig EVT'] for x in data])
+		c5 = fits.Column(name=prefix+'CLK_Trigger_Event', array=a5, format='I')
+
+		a6 = np.array([x[0]['Trig Header']['Trig Code'] for x in data])
+		c6 = fits.Column(name=prefix+'CLK_Trigger_Code', array=a6, format='I')	
 
 		# GPS Header
-		a7 = np.array([x[0]['GPS Header']['GPS Second'] for x in self.cblts])
-		c7 = fits.Column(name='GPS Second', array=a7, format='J')	
-		columns.append(c7)
+		a7 = np.array([x[0]['GPS Header']['GPS Second'] for x in data])
+		c7 = fits.Column(name=prefix+'GPS_Second', array=a7, format='J')	
 		
 		# Elapsed Header
-		a8 = np.array([x[0]['Elapsed Header']['Elapsed Time Scalar'] for x in self.cblts])
-		c8 = fits.Column(name='Elapsed Time Scalar', array=a8, format='J')	
-		columns.append(c8)
+		a8 = np.array([x[0]['Elapsed Header']['Elapsed Time Scalar'] for x in data])
+		c8 = fits.Column(name=prefix+'Elapsed_Time_Scalar', array=a8, format='J')	
 
 		# Livetime Header
-		a9 = np.array([x[0]['Livetime Header']['Livetime Scalar'] for x in self.cblts])
-		c9 = fits.Column(name='Livetime Scalar', array=a9, format='J')	
-		columns.append(c9)
+		a9 = np.array([x[0]['Livetime Header']['Livetime Scalar'] for x in data])
+		c9 = fits.Column(name=prefix+'Livetime_Scalar', array=a9, format='J')	
 
 		# Elapsed Header
-		a10 = np.array([x[0]['Dummy Header']['Dummy Register'] for x in self.cblts])
-		c10 = fits.Column(name='Dummy Register', array=a10, format='J')	
-		columns.append(c10)
+		a10 = np.array([x[0]['Dummy Header']['Dummy Register'] for x in data])
+		c10 = fits.Column(name=prefix+'Dummy_Register', array=a10, format='J')	
 
 		# Elapsed Header
-		a11 = np.array([x[0]['Junk Header']['Junk Word'] for x in self.cblts])
-		c11 = fits.Column(name='Junk Word', array=a11, format='J')	
-		columns.append(c11)		
+		a11 = np.array([x[0]['Junk Header']['Junk Word'] for x in data])
+		c11 = fits.Column(name=prefix+'Junk_Word', array=a11, format='J')	
+
+		return (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11)
 			
-		for i in range(1, len(self.cblts[1].boards)-1):
+	def fadcHeader(self, data, board_num, reread = False):
+		
+		prefix = ''
+		if reread == True:
+			prefix = 'RR_'
 			
+		ax1 = np.array([x[board_num]['Start Header']['0xFADC'] for x in data])
+		cx1 = fits.Column(name=prefix+'Board_'+str(board_num)+'_0xFADC', array=ax1, format='I') #Unsigned
+		ax2 = np.array([x[board_num]['Start Header']['Board Number'] for x in data])
+		cx2 = fits.Column(name=prefix+'Board_'+str(board_num)+'_Board_Number', array=ax2, format='B')
+		ax3 = np.array([x[board_num]['Start Header']['Words Per Channel'] for x in data])
+		cx3 = fits.Column(name=prefix+'Board_'+str(board_num)+'_Words_Per_Channel', array=ax3, format='B')
+
+		# Event Header
+		ax4 = np.array([x[board_num]['Event Header']['Event Count'] for x in data])
+		cx4 = fits.Column(name=prefix+'Board_'+str(board_num)+'_Event_Count', array=ax4, format='J') #Unsigned
+		ax5 = np.array([x[board_num]['Event Header']['Misc. 6 bits'] for x in data])
+		cx5 = fits.Column(name=prefix+'Board_'+str(board_num)+'_misc_bits', array=ax5, format='B')
+
+		# Hit Header
+		ax6 = np.array([x[board_num]['Hit Header']['Mode'] for x in data])
+		cx6 = fits.Column(name=prefix+'Board_'+str(board_num)+'_Mode', array=ax6, format='B') #Unsigned
+		ax7 = np.array([x[board_num]['Hit Header']['HILO'] for x in data])
+		cx7 = fits.Column(name=prefix+'Board_'+str(board_num)+'_HILO', array=ax7, format='I')
+		ax8 = np.array([x[board_num]['Hit Header']['Trigger Flags'] for x in data])
+		cx8 = fits.Column(name=prefix+'Board_'+str(board_num)+'_Trigger_Flags', array=ax8, format='I')
+		ax9 = np.array([x[board_num]['Hit Header']['Channel Hits'] for x in data])
+		cx9 = fits.Column(name=prefix+'Board_'+str(board_num)+'_Channel_Hits', array=ax9, format='I')
+	
+		return (cx1, cx2, cx3, cx4, cx5, cx6, cx7, cx8, cx9)
+	
+	def fadcPayload(self, data, board_num, channel, reread = False):
+		
+		prefix = ''
+		if reread == True:
+			prefix = 'RR_'
+		
+		adcFormat = str(len(data[0][1]['Channel 1']['ADC']))+'B' #The first channel (['Channel 1']) of the first fadc board (1) of the first cblt (0)
+		ax1 = np.array([x[board_num]['Channel '+str(channel)]['ADC'] for x in data])
+		print(prefix+' '+str(len(ax1)))
+		print(board_num)
+		print(channel)
+		
+		for i in ax1:
 			print(i)
-			(cx1, cx2, cx3, cx4, cx5, cx6, cx7, cx8, cx9) = self.fadcHeader(i)
-			columns.append(cx1)
-			columns.append(cx2)
-			columns.append(cx3)
-			columns.append(cx4)
-			columns.append(cx5)
-			columns.append(cx6)
-			columns.append(cx7)
-			columns.append(cx8)
-			columns.append(cx9)
+			print('')
+		cx1 = fits.Column(name=prefix+'Board_'+str(board_num)+'_Channel_'+str(channel)+'_ADC', array=ax1, format=adcFormat)
+		
+		ax2 = np.array([x[board_num]['Channel '+str(channel)]['Channel Number'] for x in data])
+		cx2 = fits.Column(name=prefix+'Board_'+str(board_num)+'_Channel_'+str(channel), array=ax2, format='B')
+		
+		ax3 = np.array([x[board_num]['Channel '+str(channel)]['Unused'] for x in data])
+		cx3 = fits.Column(name=prefix+'Board_'+str(board_num)+'_Channel_'+str(channel)+'_Unused', array=ax3, format='I')
+		
+		ax4 = np.array([x[board_num]['Channel '+str(channel)]['Pulse Area'] for x in data])
+		cx4 = fits.Column(name=prefix+'Board_'+str(board_num)+'_Channel_'+str(channel)+'_Area', array=ax4, format='I')
+
+		return (cx1, cx2, cx3, cx4)	
+			
+	def constructTable(self, directory, path):
+		columns = []
+		
+		clkHeaders = self.clockHeader(self.cblts)
+		for item in clkHeaders:
+			columns.append(item)
+			
+		for i in range(1, self.boardNum):
+			
+			fadcHeaders = self.fadcHeader(self.cblts, i)
+			for item in fadcHeaders:
+				columns.append(item)
 
 			for j in range(10):
-				cx1, cx2, cx3, cx4 = self.fadcPayload(i, j)
-				columns.append(cx1)
-				columns.append(cx2)
-				columns.append(cx3)
-				columns.append(cx4)
+				fadcPayload = self.fadcPayload(self.cblts, i, j)
+				for item in fadcPayload:
+					columns.append(item)
+				
+		if self.rereads:
+			rr_clkHeaders = self.clockHeader(self.rereads, reread = True)
+			for item in rr_clkHeaders:
+				columns.append(item)
+				
+			for i in range(1, self.boardNum):
+				
+				rr_fadcHeaders = self.fadcHeader(self.rereads, i, reread = True)
+				for item in rr_fadcHeaders:
+					columns.append(item)
+	
+				for j in range(10):
+					rr_fadcPayload = self.fadcPayload(self.rereads, i, j, reread = True)
+					for item in rr_fadcPayload:
+						columns.append(item)
+
 
 		t = fits.BinTableHDU.from_columns(columns)
-		subprocess.call('mkdir -p /nfs/optimus/home/zdhughes/Desktop/projects/ADS/data/', shell=True)
+		subprocess.call('mkdir -p ' + directory, shell=True)
 		t.writeto(path, overwrite=True)
 		
+def spillDumpProcess(spill, directory, path):
+	print('Dumping binary...', end='')
+	spill.dumpBinary(directory, path)
+	
 def spillParseProcess(spill, directory, path):
 	print('Parsing...')
 	spill.parseCBLTs()
-	print('Dumping binary...', end='')
-	spill.dumpBinary(directory, path)
 	print('Saving Spill...', end='')
-	spill.constructTable(path)
+	spill.constructTable(directory, path)
 	print('Done')		
 		
 		
@@ -783,6 +856,7 @@ def universalCapture(ADS_socket, stop_event, livePlot, plot_selection, capture_t
 	statement5RR = None
 	statement6RS = None
 	statement9UR = None
+	statement10US = None
 	
 	if verbose:
 		statement1CS = '1C-S Sent Value: %d with length %d (CBLT command request).'
@@ -801,6 +875,7 @@ def universalCapture(ADS_socket, stop_event, livePlot, plot_selection, capture_t
 		statement5RR = '5R-R Received Value: %d with length %d (reread CBLT data).'
 		statement6RS = '6R-S Sent Value: %d with length %d (reread CBLT complete Rendevous).'
 		statement9UR = '9U-R Received Value: %d of length %d (Continue Rendevous)\n'
+		statement10US = '10U-S Sent Value: %d with length %d (OK continue Rendevous).'
 		
 	spill = SpillHolder()
 		
@@ -836,6 +911,8 @@ def universalCapture(ADS_socket, stop_event, livePlot, plot_selection, capture_t
 	#ends the while loop normally for server initiated stops (i.e. reaching the constraint).
 	try:
 		while not stop_event.is_set():
+			
+				
 			server_rendevous = ADS_socket.receiveCommandFromServer(1, statement3UR)
 			if server_rendevous != g.RENDEVOUS_PROCEED:
 				print('Got bad rendevous from server at 3U-R. Breaking.')
@@ -860,6 +937,7 @@ def universalCapture(ADS_socket, stop_event, livePlot, plot_selection, capture_t
 			checkForStopEvent(ADS_socket, stop_event, statement = statement8US)				
 
 			if reread:
+				print('REREAD IS SET!')
 				server_rendevous = ADS_socket.receiveCommandFromServer(1, statement1RR)
 				if server_rendevous != g.RENDEVOUS_PROCEED:
 					print('Got bad rendevous from server at 1R-R. Breaking.')
@@ -870,7 +948,9 @@ def universalCapture(ADS_socket, stop_event, livePlot, plot_selection, capture_t
 				reread_nwords = ADS_socket.receiveCommandFromServer(4, statement3RR)
 				ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, statement4RS)	
 				raw_reread_data = ADS_socket.recv_all(reread_nwords, statement5RR) #raw is the bytearray, cblt the numpy array.
-				ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, statement6RS)	
+				spill.addBinary(raw_reread_data, reread=True)
+				ADS_socket.sendCommandToServer(g.RENDEVOUS_PROCEED, 1, statement6RS)
+				
 				if verbose:
 					this_capture_reread = CBLTData(raw_reread_data)
 					this_capture_reread.wordifyBinaryData()
@@ -910,6 +990,8 @@ def universalCapture(ADS_socket, stop_event, livePlot, plot_selection, capture_t
 						print('Failed to send requested plot data.')
 				except queue.Empty:
 					pass
+			checkForStopEvent(ADS_socket, stop_event, statement = statement10US)
+				 
 	except HaltCapture:
 		pass
 			
